@@ -13,6 +13,7 @@ const initialBoard = [
   ['', '角', '', '', '', '', '', '飛', ''],
   ['香', '桂', '銀', '金', '玉', '金', '銀', '桂', '香']
 ];
+const boardState = initialBoard.map(row => [...row]);
 
 function createBoard() {
   const board = document.createElement('div');
@@ -23,7 +24,7 @@ function createBoard() {
       const square = document.createElement('div');
       square.className = 'square';
 
-      const piece = initialBoard[row][col];
+      const piece = boardState[row][col];
 
       if (piece) {
         const pieceElement = document.createElement('span');
