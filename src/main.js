@@ -167,10 +167,10 @@ console.log('browser-strategy-shogi-ai diagnostic version loaded.');
 async function testEngineStartup() {
   const engineStatus = document.querySelector('#engine-status');
 
-  const applied = applyEngineMove(move);
-engineStatus.textContent = applied
-  ? `AIエンジン：初手を盤面に反映しました（${move}）`
-  : `AIエンジン：指し手を生成しましたが、盤面への反映は未対応です（${move}）`;
+    const applied = applyEngineMove(move);
+    engineStatus.textContent = applied
+      ? `AIエンジン：初手を盤面に反映しました（${move}）`
+      : `AIエンジン：指し手を生成しましたが、盤面への反映は未対応です（${move}）`;
 
   try {
     const script = document.createElement('script');
