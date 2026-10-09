@@ -19,7 +19,7 @@ function createBoard() {
   board.className = 'board';
 
   for (let row = 0; row < 9; row++) {
-    for (let col = 0; col < 9; col++) {
+    for (let col = 0; col < 9; col++) 
       const square = document.createElement('div');
       square.className = 'square';
 
@@ -139,3 +139,11 @@ baseStatus.textContent =
   `ページベース：${import.meta.env.BASE_URL}`;
 
 console.log('browser-strategy-shogi-ai diagnostic version loaded.');
+const isolationStatus = document.querySelector('#isolation-status');
+const wasmStatus = document.querySelector('#wasm-status');
+
+isolationStatus.textContent =
+  `クロスオリジン分離：${window.crossOriginIsolated ? '有効' : '無効'}`;
+
+wasmStatus.textContent =
+  `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可'}`;
