@@ -168,36 +168,44 @@ async function testEngineStartup() {
 
     let stage = 'usi';
 
-    instance.addMessageListener((line) => {
-      console.log('[USI]', line);
+instance.addMessageListener((line) => {
+  console.log('[USI]', line);
 
-      if (stage === 'usi' && line.includes('usiok')) {
-        stage = 'ready';
-        engineStatus.textContent = 'AIエンジン：準備確認中...';
-        instance.postMessage('isready');
-        return;
-      }
+  const received = String(line).trim();
 
-      if (stage === 'ready' && line.includes('readyok')) {
-        stage = 'thinking';
-        engineStatus.textContent = 'AIエンジン：初手を思考中...';
-        instance.postMessage('position startpos');
-        instance.postMessage('go depth 1');
-        return;
-      }
+  if (stage === 'usi' && received.includes('usiok')) {
+    stage = 'ready';
+    engineStatus.textContent =
+      'AIエンジン：isready送信済み、応答待ち...';
 
-      if (stage === 'thinking' && line.includes('bestmove')) {
-        stage = 'done';
+    instance.postMessage('isready');
+    return;
+  }
 
-        const match = line.match(/bestmove\s+(\S+)/);
-        const move = match ? match[1] : '不明';
+  if (stage === 'ready') {
+    engineStatus.textContent =
+      `AIエンジン：準備中（受信：${received.slice(0, 80)}）`;
 
-        engineStatus.textContent =
-          `AIエンジン：1手生成成功（${move}）`;
+    if (received.includes('readyok')) {
+      stage = 'thinking';
+      engineStatus.textContent = 'AIエンジン：初手を思考中...';
+      instance.postMessage('position startpos');
+      instance.postMessage('go depth 1');
+    }
 
-        console.log('初手生成成功:', move);
-      }
-    });
+    return;
+  }
+
+  if (stage === 'thinking' && received.startsWith('bestmove')) {
+    stage = 'done';
+
+    const match = received.match(/bestmove\s+(\S+)/);
+    const move = match ? match[1] : '不明';
+
+    engineStatus.textContent =
+      `AIエンジン：1手生成成功（${move}）`;
+  }
+});
 
     instance.postMessage('usi');
 
