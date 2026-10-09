@@ -178,7 +178,8 @@ instance.addMessageListener((line) => {
     engineStatus.textContent =
       'AIエンジン：isready送信済み、応答待ち...';
 
-    instance.postMessage('isready');
+instance.postMessage('setoption name USI_Hash value 16');
+instance.postMessage('isready');
     return;
   }
 
