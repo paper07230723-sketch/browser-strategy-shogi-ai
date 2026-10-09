@@ -44,6 +44,28 @@ function createBoard() {
 
   return board;
 }
+function applyEngineMove(move) {
+  // 通常の移動形式（例：2g2f）だけを扱う
+  const match = move.match(/^([1-9])([a-i])([1-9])([a-i])(\+)?$/);
+  if (!match) {
+    console.warn('今回は反映できない指し手です:', move);
+    return false;
+  }
+  const fromCol = 9 - Number(match[1]);
+  const fromRow = match[2].charCodeAt(0) - 97;
+  const toCol = 9 - Number(match[3]);
+  const toRow = match[4].charCodeAt(0) - 97;
+  const piece = boardState[fromRow][fromCol];
+  if (!piece) {
+    console.warn('移動元に駒がありません:', move);
+    return false;
+  }
+  boardState[toRow][toCol] = piece;
+  boardState[fromRow][fromCol] = '';
+  // 盤面を最新の状態で描き直す
+  document.querySelector('.board').replaceWith(createBoard());
+  return true;
+}
 
 function createApp() {
   const container = document.createElement('main');
