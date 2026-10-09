@@ -140,3 +140,53 @@ document.querySelector('#wasm-status').textContent =
   `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可'}`;
 
 console.log('browser-strategy-shogi-ai diagnostic version loaded.');
+
+async function testEngineStartup() {
+  const engineStatus = document.querySelector('#engine-status');
+
+  engineStatus.textContent = 'AIエンジン：JavaScript読み込み中...';
+
+  try {
+    const script = document.createElement('script');
+
+    script.src = `${import.meta.env.BASE_URL}engine/sse42/yaneuraou.js`;
+
+    await new Promise((resolve, reject) => {
+      script.onload = resolve;
+      script.onerror = () => reject(
+        new Error('エンジンJavaScriptを読み込めませんでした')
+      );
+      document.head.appendChild(script);
+    });
+
+    engineStatus.textContent = 'AIエンジン：初期化中...';
+
+    if (typeof window.YaneuraOu_sse42 !== 'function') {
+      throw new Error('エンジン初期化関数が見つかりません');
+    }
+
+    const instance = await window.YaneuraOu_sse42();
+
+    instance.addMessageListener((line) => {
+      console.log('[USI]', line);
+
+      if (line.includes('usiok')) {
+        engineStatus.textContent =
+          'AIエンジン：起動成功（usiok受信）';
+      }
+    });
+
+    instance.postMessage('usi');
+
+    engineStatus.textContent =
+      'AIエンジン：起動済み、応答確認中...';
+
+  } catch (error) {
+    console.error('エンジン起動テスト失敗:', error);
+
+    engineStatus.textContent =
+      `AIエンジン：起動失敗（${error.message || '詳細はコンソールを確認'}）`;
+  }
+}
+
+testEngineStartup();
