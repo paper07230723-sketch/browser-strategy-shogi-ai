@@ -89,9 +89,31 @@ select {
   aspect-ratio: 1;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(9, 1fr);
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
   border: 2px solid #333;
   background: #d9a441;
+  overflow: hidden;
+}
+
+.square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid #555;
+  border-bottom: 1px solid #555;
+  user-select: none;
+}
+
+.square:nth-child(9n) {
+  border-right: none;
+}
+
+.square:nth-last-child(-n + 9) {
+  border-bottom: none;
 }
 
 .square {
