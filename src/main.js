@@ -66,7 +66,7 @@ function createApp() {
     <p id="base-status">ページ設定確認中...</p>
     <p id="engine-status">AIエンジン：未接続</p>
   `;
-      <p id="isolation-status">分離状態を確認中...</p>
+    <p id="isolation-status">分離状態を確認中...</p>
     <p id="wasm-status">共有メモリを確認中...</p>
 
   const controls = document.createElement('section');
