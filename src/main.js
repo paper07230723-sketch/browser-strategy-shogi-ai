@@ -224,8 +224,10 @@ instance.postMessage('isready');
     const match = received.match(/bestmove\s+(\S+)/);
     const move = match ? match[1] : '不明';
 
-    engineStatus.textContent =
-      `AIエンジン：1手生成成功（${move}）`;
+        const applied = applyEngineMove(move);
+    engineStatus.textContent = applied
+      ? `AIエンジン：初手を盤面に反映しました（${move}）`
+      : `AIエンジン：指し手を生成しましたが、盤面への反映は未対応です（${move}）`;
   }
 });
 
