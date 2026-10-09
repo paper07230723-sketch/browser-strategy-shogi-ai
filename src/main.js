@@ -148,44 +148,64 @@ async function testEngineStartup() {
 
   try {
     const script = document.createElement('script');
-
     script.src = `${import.meta.env.BASE_URL}engine/sse42/yaneuraou.js`;
 
     await new Promise((resolve, reject) => {
       script.onload = resolve;
-      script.onerror = () => reject(
-        new Error('エンジンJavaScriptを読み込めませんでした')
-      );
+      script.onerror = () =>
+        reject(new Error('エンジンJavaScriptの読み込みに失敗'));
+
       document.head.appendChild(script);
     });
-
-    engineStatus.textContent = 'AIエンジン：初期化中...';
 
     if (typeof window.YaneuraOu_sse42 !== 'function') {
       throw new Error('エンジン初期化関数が見つかりません');
     }
 
+    engineStatus.textContent = 'AIエンジン：WASM初期化中...';
+
     const instance = await window.YaneuraOu_sse42();
+
+    let stage = 'usi';
 
     instance.addMessageListener((line) => {
       console.log('[USI]', line);
 
-      if (line.includes('usiok')) {
+      if (stage === 'usi' && line.includes('usiok')) {
+        stage = 'ready';
+        engineStatus.textContent = 'AIエンジン：準備確認中...';
+        instance.postMessage('isready');
+        return;
+      }
+
+      if (stage === 'ready' && line.includes('readyok')) {
+        stage = 'thinking';
+        engineStatus.textContent = 'AIエンジン：初手を思考中...';
+        instance.postMessage('position startpos');
+        instance.postMessage('go depth 1');
+        return;
+      }
+
+      if (stage === 'thinking' && line.includes('bestmove')) {
+        stage = 'done';
+
+        const match = line.match(/bestmove\s+(\S+)/);
+        const move = match ? match[1] : '不明';
+
         engineStatus.textContent =
-          'AIエンジン：起動成功（usiok受信）';
+          `AIエンジン：1手生成成功（${move}）`;
+
+        console.log('初手生成成功:', move);
       }
     });
 
     instance.postMessage('usi');
 
-    engineStatus.textContent =
-      'AIエンジン：起動済み、応答確認中...';
-
   } catch (error) {
-    console.error('エンジン起動テスト失敗:', error);
+    console.error('エンジンテスト失敗:', error);
 
     engineStatus.textContent =
-      `AIエンジン：起動失敗（${error.message || '詳細はコンソールを確認'}）`;
+      `AIエンジン：テスト失敗（${error.message || '詳細はコンソールを確認'}）`;
   }
 }
 
