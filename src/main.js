@@ -1,11 +1,4 @@
-import './style.css';
-
-const app = document.querySelector('#app');
-
-const initialBoard = [
-  ['香', '桂', '銀', '金', '王', '金', '銀', '桂', '香'],
-  ['', '飛', '', '', '', '', '', '角', ''],
-  ['歩', '歩', '歩', '歩', '歩', '歩', '歩', '歩', '歩'],
+歩'],
   ['', '', '', '', '', '', '', '', ''],
   ['', '', '', '', '', '', '', '', ''],
   ['', '', '', '', '', '', '', '', ''],
@@ -146,4 +139,4 @@ isolationStatus.textContent =
   `クロスオリジン分離：${window.crossOriginIsolated ? '有効' : '無効'}`;
 
 wasmStatus.textContent =
-  `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可
+  `SharedArra
