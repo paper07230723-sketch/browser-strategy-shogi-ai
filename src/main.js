@@ -146,4 +146,4 @@ isolationStatus.textContent =
   `クロスオリジン分離：${window.crossOriginIsolated ? '有効' : '無効'}`;
 
 wasmStatus.textContent =
-  `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可'}`;
+  `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可
