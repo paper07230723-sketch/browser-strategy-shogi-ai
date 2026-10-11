@@ -147,8 +147,18 @@ function handleSquareClick(row, col) {
       return;
     }
 
-    const usi = `${selectedHandPiece}${squareName(row, col)}`;
-    const move = record.position.createMoveByUSI(usi);
+const usiPiece = {
+  pawn: 'P',
+  lance: 'L',
+  knight: 'N',
+  silver: 'S',
+  gold: 'G',
+  bishop: 'B',
+  rook: 'R'
+}[selectedHandPiece];
+
+const usi = `${usiPiece}*${squareName(row, col)}`;
+const move = record.position.createMoveByUSI(usi);
     commitMove(move);
     return;
   }
