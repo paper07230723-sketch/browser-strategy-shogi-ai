@@ -66,10 +66,10 @@ if (typeof window === 'undefined') {
 
         // You can customize the behavior of this script through a global `coi` variable.
         const coi = {
-            shouldRegister: () => !reloadedBySelf,
+            shouldRegister: () => false,
             shouldDeregister: () => false,
             coepCredentialless: () => true,
-            coepDegrade: () => true,
+            coepDegrade: () => false,
             doReload: () => window.location.reload(),
             quiet: false,
             ...window.coi
@@ -126,9 +126,7 @@ if (typeof window === 'undefined') {
                 !coi.quiet && console.log("COOP/COEP Service Worker registered", registration.scope);
 
                 registration.addEventListener("updatefound", () => {
-                    !coi.quiet && console.log("Reloading page to make use of updated COOP/COEP Service Worker.");
-                    window.sessionStorage.setItem("coiReloadedBySelf", "updatefound");
-                    coi.doReload();
+                    !coi.quiet && console.log("COOP/COEP Service Worker update detected; automatic reload skipped.");
                 });
 
                 // If the registration is active, but it's not controlling the page
