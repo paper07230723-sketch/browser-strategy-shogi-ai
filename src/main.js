@@ -48,6 +48,7 @@ let engineStage = 'loading';
 let engineStatusText = 'AIエンジン：接続準備中';
 let aiStatusText = 'AIの初期化中';
 let moveHistory = [];
+let ignoreNextBestmove = false;
 // 投了：対局開始前の状態に戻す
 function resignGame() {
   if (!gameStarted) return;
