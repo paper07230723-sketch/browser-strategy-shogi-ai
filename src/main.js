@@ -49,6 +49,142 @@ let engineStatusText = 'AIエンジン：接続準備中';
 let aiStatusText = 'AIの初期化中';
 let moveHistory = [];
 let ignoreNextBestmove = false;
+let gameOver = false;
+let gameOverTitle = '';
+let gameOverDetail = '';
+
+// 現在の手番に合法手が残っているか調べる
+function hasLegalMove() {
+  const position = record.position;
+  const squares = position.board.squares;
+
+  // 盤上の駒を移動する手を調べる
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const piece = squares[row * 9 + col];
+
+      if (!piece || piece.color !== position.color) {
+        continue;
+      }
+
+      const from = squareName(row, col);
+
+      for (let toRow = 0; toRow < 9; toRow++) {
+        for (let toCol = 0; toCol < 9; toCol++) {
+          if (row === toRow && col === toCol) {
+            continue;
+          }
+
+          const to = squareName(toRow, toCol);
+
+          const normalMove =
+            position.createMoveByUSI(from + to);
+
+          if (
+            normalMove &&
+            position.isValidMove(normalMove)
+          ) {
+            return true;
+          }
+
+          const promotedMove =
+            position.createMoveByUSI(from + to + '+');
+
+          if (
+            promotedMove &&
+            position.isValidMove(promotedMove)
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // 持ち駒を打つ手を調べる
+  const dropLetters = {
+    rook: 'R',
+    bishop: 'B',
+    gold: 'G',
+    silver: 'S',
+    knight: 'N',
+    lance: 'L',
+    pawn: 'P'
+  };
+
+  const hand = position.hand(position.color);
+
+  for (const type of handTypes) {
+    if (hand.count(type) <= 0) {
+      continue;
+    }
+
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (squares[row * 9 + col]) {
+          continue;
+        }
+
+        const usi =
+          `${dropLetters[type]}*${squareName(row, col)}`;
+
+        const move = position.createMoveByUSI(usi);
+
+        if (move && position.isValidMove(move)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+// 勝敗を確定する
+function finishGame(winnerSource) {
+  gameOver = true;
+  gameStarted = false;
+  aiThinking = false;
+  engineStage = 'idle';
+
+  gameOverTitle =
+    winnerSource === 'human'
+      ? 'プレイヤーの勝ち'
+      : 'AIの勝ち';
+
+  gameOverDetail = '指せる手がありません。';
+
+  clearSelection();
+
+  message = gameOverTitle;
+  setEngineStatus('AIエンジン：対局終了');
+  setAIStatus('対局終了');
+
+  addDiagnostic(`対局終了：${gameOverTitle}`);
+
+  render();
+}
+
+// 終了画面から対局設定に戻る
+function returnToGameSetup() {
+  record.clear();
+  moveHistory = [];
+
+  clearSelection();
+
+  gameOver = false;
+  gameOverTitle = '';
+  gameOverDetail = '';
+  gameStarted = false;
+  aiThinking = false;
+  engineStage = 'idle';
+
+  message =
+    '先手・後手を選んで「対局を開始」を押してください。';
+
+  setAIStatus('対局開始待ち');
+  render();
+}
 // 投了：対局開始前の状態に戻す
 function resignGame() {
   if (!gameStarted) return;
@@ -262,12 +398,19 @@ function commitMove(move, usi, source = 'human') {
   }
 
   moveHistory.push(usi);
+
+  // 着手後、次の手番に合法手がなければ対局終了
+  if (!hasLegalMove()) {
+    finishGame(source);
+    return true;
+  }
+
   finishMove();
 
-  // 人間の着手後、AIが準備済みなら自動で応手する。
+  // プレイヤーの着手後は、AIに応手させる
   if (source === 'human' && engineReady && gameStarted) {
-  requestAiMove();
-}
+    requestAiMove();
+  }
 
   return true;
 }
@@ -324,6 +467,7 @@ function mustPromote(toRow, piece) {
 }
 
 function handleSquareClick(row, col) {
+  if (gameOver) return;
   if (!gameStarted) {
   message = engineReady
     ? '「AIの初手を開始」を押してください。'
@@ -495,7 +639,7 @@ function createHand(color, label) {
   color !== playerColor ||
   !gameStarted ||
   aiThinking;
-
+  gameOver;
     if (selectedHandPiece === type && color === record.position.color) {
       button.classList.add('selected');
     }
@@ -529,6 +673,7 @@ function createBoard() {
 
       square.disabled =
         !gameStarted ||
+        gameOver ||
         aiThinking ||
         record.position.color !== playerColor;
 
@@ -619,10 +764,10 @@ thinkTimeSelect.addEventListener('change', () => {
 const turnSelect = controls.querySelector('#turn-select');
 
 turnSelect.value = playerColor;
-turnSelect.disabled = gameStarted || aiThinking;
+turnSelect.disabled = gameStarted || aiThinking || gameOver;
 
 turnSelect.addEventListener('change', () => {
-  if (gameStarted || aiThinking) return;
+  if (gameStarted || aiThinking || gameOver) return;
 
   playerColor = turnSelect.value;
 
@@ -638,10 +783,10 @@ turnSelect.addEventListener('change', () => {
 );
 
 startAiButton.type = 'button';
-startAiButton.disabled = !engineReady || gameStarted || aiThinking;
+startAiButton.disabled = !engineReady || gameStarted || aiThinking || gameOver;
 
 startAiButton.addEventListener('click', () => {
-  if (!engineReady || gameStarted || aiThinking) return;
+  if (!engineReady || gameStarted || aiThinking || gameOver) return;
 
   gameStarted = true;
 
@@ -669,6 +814,34 @@ container.appendChild(startAiButton);
   container.appendChild(makeElement('p', 'move-message', message));
   const boardArea = makeElement('div', 'board-area');
 boardArea.appendChild(createBoard());
+
+if (gameOver) {
+  const overlay = makeElement('section', 'game-over-overlay');
+
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'assertive');
+
+  overlay.appendChild(
+    makeElement('h2', 'game-over-title', gameOverTitle)
+  );
+
+  overlay.appendChild(
+    makeElement('p', 'game-over-detail', gameOverDetail)
+  );
+
+  const returnButton = makeElement(
+    'button',
+    'game-over-button',
+    '対局設定に戻る'
+  );
+
+  returnButton.type = 'button';
+  returnButton.addEventListener('click', returnToGameSetup);
+
+  overlay.appendChild(returnButton);
+  boardArea.appendChild(overlay);
+}
+
 container.appendChild(boardArea);
   if (playerColor === 'white') {
   // プレイヤーが後手なら、下側は後手の持ち駒
@@ -684,7 +857,8 @@ waitButton.disabled =
   !gameStarted ||
   aiThinking ||
   pendingPromotion ||
-  moveHistory.length < (playerColor === 'black' ? 2 : 3);
+  moveHistory.length < (playerColor === 'black' ? 2 : 3) ||
+  gameOver;
 
 waitButton.addEventListener('click', takeBack);
 container.appendChild(waitButton);
@@ -748,7 +922,7 @@ container.appendChild(waitButton);
 
   const resignButton = makeElement('button', 'resign-button', '投了');
 resignButton.type = 'button';
-resignButton.disabled = !gameStarted;
+resignButton.disabled = !gameStarted || gameOver;
 
 resignButton.addEventListener('click', resignGame);
 
@@ -806,16 +980,16 @@ function applyEngineMove(usiMove) {
 
   const applied = commitMove(move, usiMove, 'ai');
 
-  if (applied) {
-    setEngineStatus(`AIの指し手を反映しました：${usiMove}`);
-    setAIStatus('AIが1手指しました');
-  }
+  if (applied && !gameOver) {
+  setEngineStatus(`AIの指し手を反映しました：${usiMove}`);
+  setAIStatus('AIが1手指しました');
+}
 
   return applied;
 }
 
 function requestAiMove() {
-  if (!engineReady || !engine || aiThinking) return;
+  if (!engineReady || !engine || aiThinking || gameOver) return;
 
   aiThinking = true;
   engineStage = 'thinking';
