@@ -1218,7 +1218,7 @@ async function startEngineSafely() {
   // 先にService Workerと応答ヘッダーを診断する
   await diagnoseServiceWorker();
 
-  const retryKey = 'browser-strategy-shogi-ai-coi-retry';
+  const retryKey = 'browser-strategy-shogi-ai-coi-retry-v2';
 
   // 分離とSharedArrayBufferの両方が使える場合だけ起動する
   if (
