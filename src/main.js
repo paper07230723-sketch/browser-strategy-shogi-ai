@@ -655,7 +655,13 @@ container.appendChild(boardArea);
   });
   container.appendChild(resetButton);
 
-  return container;
+// リセットボタンを対局開始ボタンの近くへ移動する
+container.insertBefore(
+  resetButton,
+  container.querySelector('.hand-area')
+);
+
+return container;
 }
 
 function render() {

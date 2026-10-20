@@ -296,3 +296,24 @@ button {
 .board.flipped {
   transform: rotate(180deg);
 }
+/* 初期局面に戻すボタンを見つけやすくする */
+.reset-button {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  margin: 16px 0;
+  padding: 14px 18px;
+  color: #fff;
+  background: #a83232;
+  border: 2px solid #762020;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 #762020;
+  cursor: pointer;
+}
+
+.reset-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #762020;
+}
