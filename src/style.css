@@ -175,3 +175,124 @@ select {
     width: 100%;
   }
 }
+
+
+/* スマートフォンでのダブルタップ拡大を抑制 */
+button {
+  touch-action: manipulation;
+}
+/* 対局開始ボタンを目立たせる */
+.start-ai-button {
+  display: block;
+  width: 100%;
+  min-height: 54px;
+  margin: 16px 0;
+  padding: 14px 18px;
+  color: #fff;
+  background: #17683f;
+  border: 2px solid #104b2d;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 #104b2d;
+  cursor: pointer;
+}
+
+.start-ai-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 持ち駒のエリアを明確にする */
+.hand-area {
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff;
+  border: 2px solid #a97724;
+  border-radius: 12px;
+}
+
+.hand-area h3 {
+  margin: 0 0 10px;
+  font-size: 17px;
+}
+
+.hand-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hand-piece {
+  padding: 10px 14px;
+  color: #222;
+  background: #fff0c7;
+  border: 2px solid #a97724;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.hand-piece.selected {
+  background: #ffda75;
+  border-color: #754400;
+  box-shadow: inset 0 0 0 2px #d39a25;
+}
+
+/* 選択中のマスを濃くする */
+.square.selected {
+  background: #bd852e;
+  box-shadow: inset 0 0 0 3px #754400;
+}
+/* 成り・不成りの選択を盤面の中央に重ねる */
+.board-area {
+  position: relative;
+  width: min(92vw, 500px);
+  margin: 0 auto;
+}
+
+.board-area .board {
+  width: 100%;
+  margin: 0;
+}
+
+.promotion-choices {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  width: min(90%, 360px);
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 3px solid #754400;
+  border-radius: 14px;
+  box-shadow: 0 6px 24px #0006;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.promotion-choices button {
+  min-width: 100px;
+  padding: 12px 18px;
+  background: #ffda75;
+  border: 2px solid #754400;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.promotion-choices button:active {
+  background: #eebd42;
+}
+/* 後手を選んだ場合、盤面を180度回転する */
+.board.flipped {
+  transform: rotate(180deg);
+}

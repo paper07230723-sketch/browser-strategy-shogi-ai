@@ -1,0 +1,266 @@
+import './style.css';
+import { importKIF, pieceTypeToStringForBoard } from 'tsshogi';
+
+const app = document.querySelector('#app');
+
+const initialKIF = [
+  '手合割：平手',
+  '先手：先手',
+  '後手：後手',
+  '手数----指手---------消費時間--'
+].join('\n');
+
+const record = importKIF(initialKIF);
+
+if (record instanceof Error) throw record;
+
+const pieceNames = {
+  pawn: '歩',
+  lance: '香',
+  knight: '桂',
+  silver: '銀',
+  gold: '金',
+  bishop: '角',
+  rook: '飛',
+  king: '玉',
+  promPawn: 'と',
+  promLance: '杏',
+  promKnight: '圭',
+  promSilver: '全',
+  horse: '馬',
+  dragon: '龍'
+};
+
+let selectedSquare = null;
+let message = '先手の番です。動かす駒を選んでください。';
+
+function makeElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function squareName(row, col) {
+  // USIの座標は右上が1a、左下が9i。
+  return `${9 - col}${String.fromCharCode(97 + row)}`;
+}
+
+function getPiece(row, col) {
+  return record.position.board.squares[row * 9 + col];
+}
+
+function isCurrentPlayerPiece(piece) {
+  return piece && piece.color === record.position.color;
+}
+
+function tryMove(fromRow, fromCol, toRow, toCol) {
+  const from = squareName(fromRow, fromCol);
+  const to = squareName(toRow, toCol);
+
+  const normalMove = record.position.createMoveByUSI(from + to);
+  const promoteMove = record.position.createMoveByUSI(from + to + '+');
+
+  const candidates = [normalMove, promoteMove].filter(Boolean);
+
+  for (const move of candidates) {
+    if (record.position.isValidMove(move)) {
+      if (record.append(move)) {
+        selectedSquare = null;
+        message = record.position.color === 'white'
+          ? '先手の番です。'
+          : '後手の番です。';
+        render();
+        return true;
+      }
+    }
+  }
+
+  message = 'その場所には移動できません。別のマスを選んでください。';
+  render();
+  return false;
+}
+
+function handleSquareClick(row, col) {
+  const piece = getPiece(row, col);
+
+  if (!selectedSquare) {
+    if (isCurrentPlayerPiece(piece)) {
+      selectedSquare = { row, col };
+      message = '移動先のマスを選んでください。';
+    } else {
+      message = '動かす側の駒を選んでください。';
+    }
+    render();
+    return;
+  }
+
+  if (selectedSquare.row === row && selectedSquare.col === col) {
+    selectedSquare = null;
+    message = '駒の選択を解除しました。';
+    render();
+    return;
+  }
+
+  if (isCurrentPlayerPiece(piece)) {
+    selectedSquare = { row, col };
+    message = '別の駒を選択しました。移動先を選んでください。';
+    render();
+    return;
+  }
+
+  tryMove(selectedSquare.row, selectedSquare.col, row, col);
+}
+
+function createBoard() {
+  const board = makeElement('div', 'board');
+  const squares = record.position.board.squares;
+
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const square = makeElement('button', 'square');
+      square.type = 'button';
+      square.setAttribute('aria-label', `${9 - col}筋 ${row + 1}段`);
+
+      if (
+        selectedSquare &&
+        selectedSquare.row === row &&
+        selectedSquare.col === col
+      ) {
+        square.classList.add('selected');
+      }
+
+      const piece = squares[row * 9 + col];
+
+      if (piece) {
+        const pieceElement = makeElement(
+          'span',
+          'piece',
+          pieceNames[piece.type] ?? pieceTypeToStringForBoard(piece.type)
+        );
+
+        if (piece.color === 'black') {
+          pieceElement.classList.add('gote');
+        }
+
+        square.appendChild(pieceElement);
+      }
+      square.addEventListener('click', () => handleSquareClick(row, col));
+      board.appendChild(square);
+    }
+  }
+
+  return board;
+}
+
+function createApp() {
+  const container = makeElement('main', 'container');
+  container.appendChild(makeElement('h1', '', '戦型指定型将棋AI'));
+  container.appendChild(makeElement('p', 'subtitle', '駒の移動テスト版'));
+
+  const status = makeElement('section', 'status');
+  status.innerHTML = `
+    <h2>システム診断</h2>
+    <p id="browser-status"></p>
+    <p id="base-status"></p>
+    <p id="engine-status">AIエンジン：未接続</p>
+    <p id="isolation-status"></p>
+    <p id="wasm-status"></p>
+  `;
+  container.appendChild(status);
+
+  const controls = makeElement('section', 'controls');
+  controls.innerHTML = `
+    <label>手番
+      <select id="turn-select">
+        <option value="white">先手</option>
+        <option value="black">後手</option>
+      </select>
+    </label>
+    <label>戦型
+      <select>
+        <option>指定なし</option>
+        <option>右四間飛車</option>
+      </select>
+    </label>
+    <label>思考時間
+      <select>
+        <option>0秒</option>
+        <option>1秒</option>
+        <option>2秒</option>
+        <option>3秒</option>
+        <option>5秒</option>
+      </select>
+    </label>
+  `;
+  container.appendChild(controls);
+
+  const boardTitle = makeElement('h2', '', '盤面');
+  container.appendChild(boardTitle);
+
+  const messageElement = makeElement('p', 'move-message', message);
+  messageElement.id = 'move-message';
+  container.appendChild(messageElement);
+
+  container.appendChild(createBoard());
+
+  const information = makeElement('section', 'information');
+  information.id = 'move-information';
+  information.innerHTML = `
+    <p>手数：0</p>
+    <p>評価値：—</p>
+    <p>AI状態：駒の移動テスト中</p>
+  `;
+  container.appendChild(information);
+
+  const resetButton = makeElement('button', 'reset-button', '初期局面に戻す');
+  resetButton.type = 'button';
+  resetButton.addEventListener('click', () => {
+    record.clear();
+    selectedSquare = null;
+    message = '初期局面に戻しました。先手の番です。';
+    render();
+  });
+  container.appendChild(resetButton);
+
+  return container;
+}
+
+function render() {
+  app.replaceChildren(createApp());
+
+  document.querySelector('#browser-status').textContent =
+    `ブラウザ：${navigator.userAgent.includes('Safari') ? 'Safari系ブラウザ' : '確認済み'}`;
+
+  document.querySelector('#base-status').textContent =
+    `ページベース：${import.meta.env.BASE_URL}`;
+
+  document.querySelector('#isolation-status').textContent =
+    `クロスオリジン分離：${window.crossOriginIsolated ? '有効' : '無効'}`;
+
+  document.querySelector('#wasm-status').textContent =
+    `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可'}`;
+
+  document.querySelector('#turn-select').value = record.position.color;
+
+  document.querySelector('#move-message').textContent = message;
+  document.querySelector('#move-information').innerHTML = `
+    <p>手数：${Math.max(0, record.length - 1)}</p>
+    <p>評価値：—</p>
+    <p>AI状態：駒の移動テスト中（AI未接続）</p>
+  `;
+}
+
+app.appendChild(createApp());
+
+document.querySelector('#browser-status').textContent =
+  `ブラウザ：${navigator.userAgent.includes('Safari') ? 'Safari系ブラウザ' : '確認済み'}`;
+
+document.querySelector('#base-status').textContent =
+  `ページベース：${import.meta.env.BASE_URL}`;
+
+document.querySelector('#isolation-status').textContent =
+  `クロスオリジン分離：${window.crossOriginIsolated ? '有効' : '無効'}`;
+
+document.querySelector('#wasm-status').textContent =
+  `SharedArrayBuffer：${typeof SharedArrayBuffer !== 'undefined' ? '利用可能' : '利用不可'}`;
