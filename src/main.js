@@ -1214,5 +1214,73 @@ if (factoryType !== 'function') {
     render();
   }
 }
-void diagnoseServiceWorker();
-void connectEngine();  
+async function startEngineSafely() {
+  // 先にService Workerと応答ヘッダーを診断する
+  await diagnoseServiceWorker();
+
+  const retryKey = 'browser-strategy-shogi-ai-coi-retry';
+
+  // 分離とSharedArrayBufferの両方が使える場合だけ起動する
+  if (
+    window.crossOriginIsolated === true &&
+    typeof SharedArrayBuffer !== 'undefined'
+  ) {
+    try {
+      sessionStorage.removeItem(retryKey);
+    } catch (error) {
+      // 保存領域が使えない場合も起動を続ける
+    }
+
+    addDiagnostic('分離状態を確認。エンジン起動を開始します。');
+    await connectEngine();
+    return;
+  }
+
+  addDiagnostic(
+    '分離状態を確認できません。' +
+    `crossOriginIsolated=${window.crossOriginIsolated}; ` +
+    `SharedArrayBuffer=${typeof SharedArrayBuffer}; ` +
+    `Service Worker=${
+      navigator.serviceWorker?.controller
+        ? 'controllerあり'
+        : 'controllerなし'
+    }`
+  );
+
+  let retryAttempted = false;
+
+  try {
+    retryAttempted = sessionStorage.getItem(retryKey) === '1';
+  } catch (error) {
+    addDiagnostic('再読み込み判定用の保存領域を利用できません。');
+  }
+
+  // Service Workerがページを制御している場合は、一度だけ再試行
+  if (
+    navigator.serviceWorker?.controller &&
+    !retryAttempted
+  ) {
+    try {
+      sessionStorage.setItem(retryKey, '1');
+      addDiagnostic('分離状態を回復するため、一度再読み込みします。');
+      window.location.reload();
+      return;
+    } catch (error) {
+      addDiagnostic(
+        `再読み込みの準備に失敗: ${error?.message || String(error)}`
+      );
+    }
+  }
+
+  // 分離できていない状態ではエンジンを起動しない
+  setEngineStatus(
+    'AIエンジン：分離設定を確認できません。再読み込みが必要です。'
+  );
+  setAIStatus(
+    'SharedArrayBufferが利用できないため、エンジンの起動を停止しました。'
+  );
+
+  render();
+}
+
+void startEngineSafely();
