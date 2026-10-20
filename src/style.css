@@ -296,8 +296,8 @@ button {
 .board.flipped {
   transform: rotate(180deg);
 }
-/* 初期局面に戻すボタンを見つけやすくする */
-.reset-button {
+/* 投了ボタン */
+.resign-button {
   display: block;
   width: 100%;
   min-height: 54px;
@@ -313,7 +313,34 @@ button {
   cursor: pointer;
 }
 
-.reset-button:active {
+.resign-button:active:not(:disabled) {
   transform: translateY(2px);
   box-shadow: 0 1px 0 #762020;
+}
+
+/* 待ったボタン */
+.wait-button {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin: 12px 0;
+  padding: 12px 18px;
+  color: #222;
+  background: #ffda75;
+  border: 2px solid #a97724;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wait-button:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.resign-button:disabled,
+.wait-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }

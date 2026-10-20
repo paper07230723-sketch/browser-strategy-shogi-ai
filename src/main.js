@@ -48,6 +48,75 @@ let engineStage = 'loading';
 let engineStatusText = 'AIエンジン：接続準備中';
 let aiStatusText = 'AIの初期化中';
 let moveHistory = [];
+// 投了：対局開始前の状態に戻す
+function resignGame() {
+  if (!gameStarted) return;
+
+  // AIが思考中なら停止し、遅れて届いた指し手を無視する
+  if (aiThinking && engine) {
+    ignoreNextBestmove = true;
+
+    try {
+      engine.postMessage('stop');
+    } catch (error) {
+      ignoreNextBestmove = false;
+    }
+  }
+
+  aiThinking = false;
+  engineStage = 'idle';
+  record.clear();
+  moveHistory = [];
+  clearSelection();
+  gameStarted = false;
+
+  message = '投了しました。先手・後手を選んで再び対局を開始できます。';
+  setAIStatus('投了により対局終了');
+  render();
+}
+
+// 待った：直前の人間とAIの着手を取り消す
+function takeBack() {
+  if (!gameStarted || aiThinking || pendingPromotion) return;
+
+  // 先手なら最低2手、後手ならAIの初手も含めて最低3手必要
+  const minimumMoves = playerColor === 'black' ? 2 : 3;
+
+  if (moveHistory.length < minimumMoves) {
+    message = 'まだ取り消せる着手がありません。';
+    render();
+    return;
+  }
+
+  // 直前の2手を除いた棋譜を作る
+  const movesToKeep = moveHistory.slice(0, -2);
+
+  record.clear();
+
+  // 初期局面から、残す棋譜を再生して盤面を復元する
+  for (const usi of movesToKeep) {
+    const move = record.position.createMoveByUSI(usi);
+
+    if (!move || !record.append(move)) {
+      record.clear();
+      moveHistory = [];
+      clearSelection();
+      gameStarted = false;
+
+      message = '盤面を復元できなかったため、対局を初期状態に戻しました。';
+      setAIStatus('待った処理に失敗');
+      render();
+      return;
+    }
+  }
+
+  moveHistory = movesToKeep;
+  clearSelection();
+
+  message = '直前のプレイヤーとAIの着手を取り消しました。';
+  setAIStatus('待ったを適用しました');
+  render();
+}
 const DIAGNOSTIC_STORAGE_KEY =
   'browser-strategy-shogi-ai-diagnostics-v1';
 
@@ -588,14 +657,36 @@ startAiButton.addEventListener('click', () => {
 
 container.appendChild(startAiButton);
 
+  if (playerColor === 'white') {
+  // プレイヤーが後手なら、上側は先手の持ち駒
+  container.appendChild(createHand('black', '先手'));
+} else {
+  // プレイヤーが先手なら、上側は後手の持ち駒
   container.appendChild(createHand('white', '後手'));
+}
   container.appendChild(makeElement('h2', '', '盤面'));
   container.appendChild(makeElement('p', 'move-message', message));
   const boardArea = makeElement('div', 'board-area');
 boardArea.appendChild(createBoard());
 container.appendChild(boardArea);
+  if (playerColor === 'white') {
+  // プレイヤーが後手なら、下側は後手の持ち駒
+  container.appendChild(createHand('white', '後手'));
+} else {
+  // プレイヤーが先手なら、下側は先手の持ち駒
   container.appendChild(createHand('black', '先手'));
+}
+const waitButton = makeElement('button', 'wait-button', '待った');
+waitButton.type = 'button';
 
+waitButton.disabled =
+  !gameStarted ||
+  aiThinking ||
+  pendingPromotion ||
+  moveHistory.length < (playerColor === 'black' ? 2 : 3);
+
+waitButton.addEventListener('click', takeBack);
+container.appendChild(waitButton);
   const information = makeElement('section', 'information');
   information.id = 'move-information';
   information.innerHTML = `
@@ -624,7 +715,7 @@ container.appendChild(boardArea);
     });
     choices.appendChild(promoteButton);
 
-    if (pendingPromotion.normalValid) {
+        if (pendingPromotion.normalValid) {
       const normalButton = makeElement('button', '', '成らない');
       normalButton.type = 'button';
       normalButton.addEventListener('click', () => {
@@ -641,23 +732,30 @@ container.appendChild(boardArea);
       choices.appendChild(normalButton);
     }
 
+    // 駒を移動させず、成りの選択を取り消す
+    const cancelButton = makeElement('button', '', 'キャンセル');
+    cancelButton.type = 'button';
+    cancelButton.addEventListener('click', () => {
+      clearSelection();
+      message = '駒の移動をキャンセルしました。';
+      render();
+    });
+    choices.appendChild(cancelButton);
+
     boardArea.appendChild(choices);
   }
 
-  const resetButton = makeElement('button', 'reset-button', '初期局面に戻す');
-  resetButton.type = 'button';
-  resetButton.addEventListener('click', () => {
-    record.clear();
-    moveHistory = [];
-    clearSelection();
-    message = '初期局面に戻しました。先手の番です。';
-    render();
-  });
-  container.appendChild(resetButton);
+  const resignButton = makeElement('button', 'resign-button', '投了');
+resignButton.type = 'button';
+resignButton.disabled = !gameStarted;
 
-// リセットボタンを対局開始ボタンの近くへ移動する
+resignButton.addEventListener('click', resignGame);
+
+container.appendChild(resignButton);
+
+// 以前のリセットボタンと同じ位置に配置する
 container.insertBefore(
-  resetButton,
+  resignButton,
   container.querySelector('.hand-area')
 );
 
@@ -1136,7 +1234,11 @@ if (factoryType !== 'function') {
     engine.addMessageListener((line) => {
       const received = String(line).trim();
       console.log('[USI]', received);
-
+  if (received.startsWith('bestmove') && ignoreNextBestmove) {
+    ignoreNextBestmove = false;
+    addDiagnostic('投了後に届いたAIの指し手を無視しました。');
+    return;
+  }
       if (engineStage === 'usi' && received.includes('usiok')) {
         engineStage = 'ready';
 
