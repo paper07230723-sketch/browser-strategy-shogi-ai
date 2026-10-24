@@ -167,35 +167,21 @@ jobs:
             const waiters = [];
             const originalConsoleLog = console.log.bind(console);
 
-            console.log = (...args) => {
-              originalConsoleLog(...args);
+                 console.log("POSTRUN_TYPE", typeof engine.postRun);
 
-              let line = null;
+            if (typeof engine.postRun !== "function") {
+              throw new Error(
+                "Expected postRun callback to be a function"
+              );
+            }
 
-              if (
-                args.length === 1 &&
-                typeof args[0] === "string"
-              ) {
-                line = args[0].trim();
-              } else if (
-                args[0] === "ENGINE:" &&
-                typeof args[1] === "string"
-              ) {
-                line = args[1].trim();
-              }
+            console.log("POSTRUN_RECOVERY: invoking function");
+            engine.postRun();
 
-              if (line === null) return;
-
-              lines.push(line);
-
-              for (let i = waiters.length - 1; i >= 0; i--) {
-                if (waiters[i].test(line)) {
-                  const waiter = waiters.splice(i, 1)[0];
-                  clearTimeout(waiter.timer);
-                  waiter.resolve(line);
-                }
-              }
-            };
+            console.log(
+              "POSTMESSAGE_AFTER",
+              engine.postMessage.toString().slice(0, 200)
+            );
 
             function waitFor(test, name, timeoutMs) {
               const existing = lines.find(test);
