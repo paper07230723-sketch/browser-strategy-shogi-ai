@@ -163,17 +163,7 @@ jobs:
             const engine = await createEngine({
               locateFile: file => path.join(__dirname, file)
             });
-            // Emscripten 4.x の postRun コールバックを確認する。
-            let recoveredPostRun = false;
-
-            if (Array.isArray(engine.postRun) && engine.postRun.length > 0) {
-              console.log("POSTRUN_RECOVERY: pending callbacks",
-                          engine.postRun.length);
-
-              while (engine.postRun.length > 0) {
-                const callback = engine.postRun.shift();
-                callback(engine);
-                         // Emscripten 4.x postRun callback check.
+            // Emscripten 4.x postRun callback check.
             let recoveredPostRun = false;
 
             console.log("POSTRUN_TYPE", typeof engine.postRun);
@@ -210,6 +200,7 @@ jobs:
               "POSTMESSAGE_AFTER",
               engine.postMessage.toString().slice(0, 200)
             );
+
             const lines = [];
             const waiters = [];
 
