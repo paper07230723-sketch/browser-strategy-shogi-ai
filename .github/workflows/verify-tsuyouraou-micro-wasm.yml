@@ -163,11 +163,25 @@ jobs:
             const engine = await createEngine({
               locateFile: file => path.join(__dirname, file)
             });
-            const lines = [];
+                        const lines = [];
             const waiters = [];
-            const originalConsoleLog = console.log.bind(console);
 
-                 console.log("POSTRUN_TYPE", typeof engine.postRun);
+            // postRun より先にメッセージ受信を登録する。
+            engine.addMessageListener(line => {
+              line = String(line).trim();
+              console.log("ENGINE:", line);
+              lines.push(line);
+
+              for (let i = waiters.length - 1; i >= 0; i--) {
+                if (waiters[i].test(line)) {
+                  const waiter = waiters.splice(i, 1)[0];
+                  clearTimeout(waiter.timer);
+                  waiter.resolve(line);
+                }
+              }
+            });
+
+            console.log("POSTRUN_TYPE", typeof engine.postRun);
 
             if (typeof engine.postRun !== "function") {
               throw new Error(
