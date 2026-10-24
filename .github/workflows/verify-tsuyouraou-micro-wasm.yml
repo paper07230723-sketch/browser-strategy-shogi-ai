@@ -163,12 +163,29 @@ jobs:
             const engine = await createEngine({
               locateFile: file => path.join(__dirname, file)
             });
-                        const lines = [];
+            const lines = [];
             const waiters = [];
+            const originalConsoleLog = console.log.bind(console);
 
-            engine.addMessageListener(line => {
-              line = String(line).trim();
-              console.log("ENGINE:", line);
+            console.log = (...args) => {
+              originalConsoleLog(...args);
+
+              let line = null;
+
+              if (
+                args.length === 1 &&
+                typeof args[0] === "string"
+              ) {
+                line = args[0].trim();
+              } else if (
+                args[0] === "ENGINE:" &&
+                typeof args[1] === "string"
+              ) {
+                line = args[1].trim();
+              }
+
+              if (line === null) return;
+
               lines.push(line);
 
               for (let i = waiters.length - 1; i >= 0; i--) {
@@ -178,45 +195,7 @@ jobs:
                   waiter.resolve(line);
                 }
               }
-            });
-
-            // Emscripten 4.x postRun callback check.
-            let recoveredPostRun = false;
-
-            console.log("POSTRUN_TYPE", typeof engine.postRun);
-            console.log(
-              "POSTMESSAGE_BEFORE",
-              engine.postMessage.toString().slice(0, 200)
-            );
-
-            if (typeof engine.postRun === "function") {
-              console.log("POSTRUN_RECOVERY: invoking function");
-              engine.postRun();
-              recoveredPostRun = true;
-            } else if (
-              Array.isArray(engine.postRun) &&
-              engine.postRun.length > 0
-            ) {
-              console.log(
-                "POSTRUN_RECOVERY: pending callbacks",
-                engine.postRun.length
-              );
-
-              while (engine.postRun.length > 0) {
-                const callback = engine.postRun.shift();
-                callback();
-              }
-
-              recoveredPostRun = true;
-            } else {
-              console.log("POSTRUN_RECOVERY: no callable callback");
-            }
-
-            console.log("POSTRUN_RECOVERY_RESULT", recoveredPostRun);
-            console.log(
-              "POSTMESSAGE_AFTER",
-              engine.postMessage.toString().slice(0, 200)
-            );
+            };
 
             function waitFor(test, name, timeoutMs) {
               const existing = lines.find(test);
