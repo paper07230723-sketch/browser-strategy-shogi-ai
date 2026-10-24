@@ -1,0 +1,114 @@
+name: Verify TuyouraOu 11 micro WASM
+
+on:
+  push:
+    branches:
+      - automation/tsuyouraou-micro-wasm-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tuyouraou-micro-wasm
+  cancel-in-progress: true
+
+jobs:
+  build-micro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned YaneuraOu source
+        uses: actions/checkout@v4
+        with:
+          repository: yaneurao/YaneuraOu
+          ref: 32165a8ded29e5fd1bcbd2fa5dbf2eeb6725bd0f
+          path: upstream
+
+      - name: Install archive utility
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y p7zip-full
+
+      - name: Setup Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: 4.0.23
+
+      - name: Verify toolchain
+        run: |
+          emcc --version
+          em++ --version
+          node --version
+          python3 --version
+
+      - name: Download and verify micro evaluation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          archive="$RUNNER_TEMP/tuyouraou-micro.7z"
+          extract_dir="$RUNNER_TEMP/micro-eval"
+
+          curl --fail --location --retry 3 \
+            "https://github.com/paper07230723-sketch/browser-strategy-shogi-ai/releases/download/eval-check-2026-10-22/TuyouraOu11micro-SFNN_ka2_2048_8_64_progress8-epoch0010-20261001.2.7z" \
+            --output "$archive"
+
+          echo "d1326e9a620c30d40ae553259dd0b6828d2f4e9fca3b6ab9440566579ab0e8c2  $archive" \
+            | sha256sum --check -
+
+          mkdir -p "$extract_dir"
+          7z x "$archive" "-o$extract_dir" -y
+
+          nn_path="$(find "$extract_dir" -type f -name nn.bin -print -quit)"
+          test -n "$nn_path"
+
+          eval_dir="$(dirname "$nn_path")"
+          for file in nn.bin progress.bin eval_options.txt tag.json; do
+            test -f "$eval_dir/$file"
+          done
+
+          mkdir -p "$GITHUB_WORKSPACE/output/evaldata"
+          cp "$eval_dir"/nn.bin \
+             "$eval_dir"/progress.bin \
+             "$eval_dir"/eval_options.txt \
+             "$eval_dir"/tag.json \
+             "$GITHUB_WORKSPACE/output/evaldata/"
+
+      - name: Build micro WASM engine
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          emmake make -j2 normal \
+            YANEURAOU_EDITION=YANEURAOU_ENGINE_SFNN_ka2_2048_8_64_progress8 \
+            TARGET_CPU=WASM \
+            COMPILER=em++ \
+            PYTHON=python3 \
+            EVAL_EMBEDDING=OFF
+
+          test -f yaneuraou.js
+          test -f yaneuraou.wasm
+
+          cp yaneuraou.js "$GITHUB_WORKSPACE/output/"
+          cp yaneuraou.wasm "$GITHUB_WORKSPACE/output/"
+
+      - name: Show output files
+        run: |
+          find output -maxdepth 2 -type f -printf '%p %s bytes\n'
+          test -s output/yaneuraou.js
+          test -s output/yaneuraou.wasm
+          test -s output/evaldata/nn.bin
+
+      - name: Upload WASM build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tuyouraou-11micro-wasm
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
