@@ -173,7 +173,8 @@ jobs:
               while (engine.postRun.length > 0) {
                 const callback = engine.postRun.shift();
                 callback(engine);
-             let recoveredPostRun = false;
+                         // Emscripten 4.x postRun callback check.
+            let recoveredPostRun = false;
 
             console.log("POSTRUN_TYPE", typeof engine.postRun);
             console.log(
@@ -204,10 +205,7 @@ jobs:
               console.log("POSTRUN_RECOVERY: no callable callback");
             }
 
-            console.log(
-              "POSTRUN_RECOVERY_RESULT",
-              recoveredPostRun
-            );
+            console.log("POSTRUN_RECOVERY_RESULT", recoveredPostRun);
             console.log(
               "POSTMESSAGE_AFTER",
               engine.postMessage.toString().slice(0, 200)
