@@ -163,6 +163,23 @@ jobs:
             const engine = await createEngine({
               locateFile: file => path.join(__dirname, file)
             });
+                        const lines = [];
+            const waiters = [];
+
+            engine.addMessageListener(line => {
+              line = String(line).trim();
+              console.log("ENGINE:", line);
+              lines.push(line);
+
+              for (let i = waiters.length - 1; i >= 0; i--) {
+                if (waiters[i].test(line)) {
+                  const waiter = waiters.splice(i, 1)[0];
+                  clearTimeout(waiter.timer);
+                  waiter.resolve(line);
+                }
+              }
+            });
+
             // Emscripten 4.x postRun callback check.
             let recoveredPostRun = false;
 
@@ -201,23 +218,6 @@ jobs:
               engine.postMessage.toString().slice(0, 200)
             );
 
-            const lines = [];
-            const waiters = [];
-
-            engine.addMessageListener(line => {
-              line = String(line).trim();
-              console.log("ENGINE:", line);
-              lines.push(line);
-
-              for (let i = waiters.length - 1; i >= 0; i--) {
-                if (waiters[i].test(line)) {
-                  const waiter = waiters.splice(i, 1)[0];
-                  clearTimeout(waiter.timer);
-                  waiter.resolve(line);
-                }
-              }
-            });
-
             function waitFor(test, name, timeoutMs) {
               const existing = lines.find(test);
               if (existing) return Promise.resolve(existing);
@@ -252,10 +252,14 @@ jobs:
               );
             }
 
-            const usiok = waitFor(
+              const usiok = waitFor(
               line => line === "usiok", "usiok", 60000
             );
-            engine.postMessage("usi");
+
+            if (!lines.includes("usiok")) {
+              engine.postMessage("usi");
+            }
+
             await usiok;
 
             engine.postMessage("setoption name USI_Hash value 64");
