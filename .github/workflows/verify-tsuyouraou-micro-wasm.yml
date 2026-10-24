@@ -78,7 +78,42 @@ jobs:
              "$eval_dir"/eval_options.txt \
              "$eval_dir"/tag.json \
              "$GITHUB_WORKSPACE/output/evaldata/"
+      - name: Apply provisional WASM startup workaround
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
 
+          p = Path("thread.cpp")
+          s = p.read_text(encoding="utf-8")
+          marker = "// 生成したスレッドに対してThread::clear_worker()を呼び出す。"
+
+          if s.count(marker) != 1:
+              raise SystemExit("ERROR: 対象箇所を一意に特定できません")
+
+          start = s.index(marker)
+          end_marker = "main_thread()->wait_for_search_finished();"
+          end = s.find(end_marker, start)
+
+          if end < 0:
+              raise SystemExit("ERROR: 待機処理が見つかりません")
+
+          end += len(end_marker)
+          old = s[start:end]
+
+          if old.count("clear();") != 1:
+              raise SystemExit("ERROR: clear() の位置が想定と異なります")
+
+          replacement = """#if !defined(__EMSCRIPTEN__)
+                  clear();
+                  main_thread()->wait_for_search_finished();
+          #endif"""
+
+          p.write_text(s[:start] + replacement + s[end:], encoding="utf-8")
+          print("WASM_STARTUP_WORKAROUND_APPLIED")
+          PY
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
@@ -112,3 +147,110 @@ jobs:
           path: output/
           if-no-files-found: error
           retention-days: 7
+      - name: Smoke-test USI in Node.js
+        working-directory: output
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp yaneuraou.js yaneuraou.cjs
+
+          cat > smoke-test.cjs <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const createEngine = require("./yaneuraou.cjs");
+
+          async function main() {
+            const engine = await createEngine({
+              locateFile: file => path.join(__dirname, file)
+            });
+
+            const lines = [];
+            const waiters = [];
+
+            engine.addMessageListener(line => {
+              line = String(line).trim();
+              console.log("ENGINE:", line);
+              lines.push(line);
+
+              for (let i = waiters.length - 1; i >= 0; i--) {
+                if (waiters[i].test(line)) {
+                  const waiter = waiters.splice(i, 1)[0];
+                  clearTimeout(waiter.timer);
+                  waiter.resolve(line);
+                }
+              }
+            });
+
+            function waitFor(test, name, timeoutMs) {
+              const existing = lines.find(test);
+              if (existing) return Promise.resolve(existing);
+
+              return new Promise((resolve, reject) => {
+                const waiter = {
+                  test,
+                  resolve,
+                  timer: setTimeout(() => {
+                    const i = waiters.indexOf(waiter);
+                    if (i >= 0) waiters.splice(i, 1);
+                    reject(new Error("TIMEOUT: " + name));
+                  }, timeoutMs)
+                };
+                waiters.push(waiter);
+              });
+            }
+
+            if (!engine.FS || !engine.postMessage ||
+                !engine.addMessageListener) {
+              throw new Error("Required WASM runtime APIs are missing");
+            }
+
+            engine.FS.mkdir("/evaldata");
+
+            for (const file of [
+              "nn.bin", "progress.bin", "eval_options.txt", "tag.json"
+            ]) {
+              engine.FS.writeFile(
+                "/evaldata/" + file,
+                fs.readFileSync(path.join(__dirname, "evaldata", file))
+              );
+            }
+
+            const usiok = waitFor(
+              line => line === "usiok", "usiok", 60000
+            );
+            engine.postMessage("usi");
+            await usiok;
+
+            engine.postMessage("setoption name USI_Hash value 64");
+            engine.postMessage("setoption name EvalDir value evaldata");
+            engine.postMessage("setoption name FV_SCALE value 24");
+
+            const readyok = waitFor(
+              line => line === "readyok", "readyok", 120000
+            );
+            engine.postMessage("isready");
+            await readyok;
+
+            const bestmove = waitFor(
+              line => /^bestmove\s+\S+/.test(line),
+              "bestmove", 90000
+            );
+
+            engine.postMessage("position startpos");
+            engine.postMessage("go depth 1");
+
+            const result = await bestmove;
+            console.log("USI_SMOKE_TEST_OK:", result);
+
+            engine.postMessage("quit");
+            await new Promise(resolve => setTimeout(resolve, 100));
+            process.exit(0);
+          }
+
+          main().catch(error => {
+            console.error("USI_SMOKE_TEST_FAILED:", error);
+            process.exit(1);
+          });
+          NODE
+
+          timeout 240s node smoke-test.cjs
