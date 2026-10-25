@@ -156,121 +156,154 @@ jobs:
 
           cat > smoke-test.cjs <<'NODE'
           const fs = require("node:fs");
-          const path = require("node:path");
-          const createEngine = require("./yaneuraou.cjs");
+const path = require("node:path");
 
-          async function main() {
-            const engine = await createEngine({
-              locateFile: file => path.join(__dirname, file)
-            });
-            const lines = [];
-            const waiters = [];
+const lines = [];
+const waiters = [];
 
-            // postRun より先にメッセージ受信を登録する。
-            engine.addMessageListener(line => {
-              line = String(line).trim();
-              console.log("ENGINE:", line);
-              lines.push(line);
+function recordLine(value) {
+  const line = String(value).trim();
+  if (!line) return;
 
-              for (let i = waiters.length - 1; i >= 0; i--) {
-                if (waiters[i].test(line)) {
-                  const waiter = waiters.splice(i, 1)[0];
-                  clearTimeout(waiter.timer);
-                  waiter.resolve(line);
-                }
-              }
-            });
+  lines.push(line);
 
-            console.log("POSTRUN_TYPE", typeof engine.postRun);
+  for (let i = waiters.length - 1; i >= 0; i--) {
+    if (waiters[i].test(line)) {
+      const waiter = waiters.splice(i, 1)[0];
+      clearTimeout(waiter.timer);
+      waiter.resolve(line);
+    }
+  }
+}
 
-            if (typeof engine.postRun !== "function") {
-              throw new Error(
-                "Expected postRun callback to be a function"
-              );
-            }
+function waitFor(test, name, timeoutMs) {
+  const existing = lines.find(test);
+  if (existing) return Promise.resolve(existing);
 
-            console.log("POSTRUN_RECOVERY: invoking function");
-            engine.postRun();
+  return new Promise((resolve, reject) => {
+    const waiter = {
+      test,
+      resolve,
+      timer: setTimeout(() => {
+        const i = waiters.indexOf(waiter);
+        if (i >= 0) waiters.splice(i, 1);
+        reject(new Error("TIMEOUT: " + name));
+      }, timeoutMs)
+    };
 
-            console.log(
-              "POSTMESSAGE_AFTER",
-              engine.postMessage.toString().slice(0, 200)
-            );
+    waiters.push(waiter);
+  });
+}
 
-            function waitFor(test, name, timeoutMs) {
-              const existing = lines.find(test);
-              if (existing) return Promise.resolve(existing);
+// エンジン起動前からコンソール出力を捕捉する。
+const originalConsoleLog = console.log.bind(console);
 
-              return new Promise((resolve, reject) => {
-                const waiter = {
-                  test,
-                  resolve,
-                  timer: setTimeout(() => {
-                    const i = waiters.indexOf(waiter);
-                    if (i >= 0) waiters.splice(i, 1);
-                    reject(new Error("TIMEOUT: " + name));
-                  }, timeoutMs)
-                };
-                waiters.push(waiter);
-              });
-            }
+console.log = (...args) => {
+  originalConsoleLog(...args);
 
-            if (!engine.FS || !engine.postMessage ||
-                !engine.addMessageListener) {
-              throw new Error("Required WASM runtime APIs are missing");
-            }
+  if (args.length === 1 && typeof args[0] === "string") {
+    recordLine(args[0]);
+  }
+};
 
-            engine.FS.mkdir("/evaldata");
+const createEngine = require("./yaneuraou.cjs");
 
-            for (const file of [
-              "nn.bin", "progress.bin", "eval_options.txt", "tag.json"
-            ]) {
-              engine.FS.writeFile(
-                "/evaldata/" + file,
-                fs.readFileSync(path.join(__dirname, "evaldata", file))
-              );
-            }
+async function main() {
+  const engine = await createEngine({
+    locateFile: file => path.join(__dirname, file)
+  });
 
-              const usiok = waitFor(
-              line => line === "usiok", "usiok", 60000
-            );
+  if (
+    !engine.FS ||
+    !engine.postMessage ||
+    !engine.addMessageListener
+  ) {
+    throw new Error("Required WASM runtime APIs are missing");
+  }
 
-            if (!lines.includes("usiok")) {
-              engine.postMessage("usi");
-            }
+  // 通常のメッセージ受信も併用する。
+  engine.addMessageListener(line => {
+    const text = String(line).trim();
+    originalConsoleLog("ENGINE:", text);
+    recordLine(text);
+  });
 
-            await usiok;
+  console.log("POSTRUN_TYPE", typeof engine.postRun);
 
-            engine.postMessage("setoption name USI_Hash value 64");
-            engine.postMessage("setoption name EvalDir value evaldata");
-            engine.postMessage("setoption name FV_SCALE value 24");
+  if (typeof engine.postRun !== "function") {
+    throw new Error("Expected postRun callback to be a function");
+  }
 
-            const readyok = waitFor(
-              line => line === "readyok", "readyok", 120000
-            );
-            engine.postMessage("isready");
-            await readyok;
+  console.log("POSTRUN_RECOVERY: invoking function");
+  engine.postRun();
 
-            const bestmove = waitFor(
-              line => /^bestmove\s+\S+/.test(line),
-              "bestmove", 90000
-            );
+  console.log(
+    "POSTMESSAGE_AFTER",
+    engine.postMessage.toString().slice(0, 200)
+  );
 
-            engine.postMessage("position startpos");
-            engine.postMessage("go depth 1");
+  engine.FS.mkdir("/evaldata");
 
-            const result = await bestmove;
-            console.log("USI_SMOKE_TEST_OK:", result);
+  for (const file of [
+    "nn.bin",
+    "progress.bin",
+    "eval_options.txt",
+    "tag.json"
+  ]) {
+    engine.FS.writeFile(
+      "/evaldata/" + file,
+      fs.readFileSync(path.join(__dirname, "evaldata", file))
+    );
+  }
 
-            engine.postMessage("quit");
-            await new Promise(resolve => setTimeout(resolve, 100));
-            process.exit(0);
-          }
+  const usiok = waitFor(
+    line => line === "usiok",
+    "usiok",
+    60000
+  );
 
-          main().catch(error => {
-            console.error("USI_SMOKE_TEST_FAILED:", error);
-            process.exit(1);
-          });
+  if (!lines.includes("usiok")) {
+    engine.postMessage("usi");
+  }
+
+  await usiok;
+  console.log("USI_HANDSHAKE_OK");
+
+  engine.postMessage("setoption name USI_Hash value 64");
+  engine.postMessage("setoption name EvalDir value evaldata");
+  engine.postMessage("setoption name FV_SCALE value 24");
+
+  const readyok = waitFor(
+    line => line === "readyok",
+    "readyok",
+    120000
+  );
+
+  engine.postMessage("isready");
+  await readyok;
+  console.log("USI_READY_OK");
+
+  const bestmove = waitFor(
+    line => /^bestmove\s+\S+/.test(line),
+    "bestmove",
+    90000
+  );
+
+  engine.postMessage("position startpos");
+  engine.postMessage("go depth 1");
+
+  const result = await bestmove;
+  console.log("USI_SMOKE_TEST_OK:", result);
+
+  engine.postMessage("quit");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  process.exit(0);
+}
+
+main().catch(error => {
+  console.error("USI_SMOKE_TEST_FAILED:", error);
+  process.exit(1);
+});
           NODE
 
           timeout 240s node smoke-test.cjs
