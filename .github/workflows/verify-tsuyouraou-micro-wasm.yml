@@ -222,6 +222,80 @@ jobs:
               "    if (idx == 0 && !exit) {\n        sync_cout << \"WASM_DIAG direct_main_search_enter\" << sync_endl;\n        worker->start_searching();\n        sync_cout << \"WASM_DIAG direct_main_search_return\" << sync_endl;\n        return;\n    }\n",
               ""
           )
+          replace_once(
+              "thread.cpp",
+              r'''void Thread::wait_for_search_finished() {
+
+              std::unique_lock<std::mutex> lk(mutex);
+              cv.wait(lk, [&] { return !searching; });
+          }''',
+              r'''void Thread::wait_for_search_finished() {
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR wait_finished_enter this=%p idx=%zu\n", static_cast<void*>(this), idx);
+              std::fflush(stderr);
+          #endif
+              std::unique_lock<std::mutex> lk(mutex);
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR wait_finished_before_cv this=%p idx=%zu searching=%d\n", static_cast<void*>(this), idx, int(searching));
+              std::fflush(stderr);
+          #endif
+              cv.wait(lk, [&] { return !searching; });
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR wait_finished_return this=%p idx=%zu searching=%d\n", static_cast<void*>(this), idx, int(searching));
+              std::fflush(stderr);
+          #endif
+          }'''
+          )
+
+          replace_once(
+              "thread.cpp",
+              r'''void Thread::run_custom_job(std::function<void()> f) {
+              {
+                  std::unique_lock<std::mutex> lk(mutex);
+                  cv.wait(lk, [&] { return !searching; });
+                  jobFunc   = std::move(f);
+                  searching = true;
+              }
+          #if defined(__EMSCRIPTEN__)
+              sync_cout << "WASM_DIAG notify_before idx=" << idx << sync_endl;
+          #endif
+              cv.notify_one();
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR notify_one this=%p idx=%zu\n", static_cast<void*>(this), idx);
+              std::fflush(stderr);
+              sync_cout << "WASM_DIAG notify_after idx=" << idx << sync_endl;
+          #endif
+          }''',
+              r'''void Thread::run_custom_job(std::function<void()> f) {
+              {
+                  std::unique_lock<std::mutex> lk(mutex);
+          #if defined(__EMSCRIPTEN__)
+                  std::fprintf(stderr, "WASM_DIAG_STDERR run_custom_job_wait_begin this=%p idx=%zu searching=%d\n", static_cast<void*>(this), idx, int(searching));
+                  std::fflush(stderr);
+          #endif
+                  cv.wait(lk, [&] { return !searching; });
+          #if defined(__EMSCRIPTEN__)
+                  std::fprintf(stderr, "WASM_DIAG_STDERR run_custom_job_wait_return this=%p idx=%zu searching=%d\n", static_cast<void*>(this), idx, int(searching));
+                  std::fflush(stderr);
+          #endif
+                  jobFunc   = std::move(f);
+                  searching = true;
+          #if defined(__EMSCRIPTEN__)
+                  std::fprintf(stderr, "WASM_DIAG_STDERR run_custom_job_queued this=%p idx=%zu searching=%d job=%d\n", static_cast<void*>(this), idx, int(searching), int(bool(jobFunc)));
+                  std::fflush(stderr);
+          #endif
+              }
+          #if defined(__EMSCRIPTEN__)
+              sync_cout << "WASM_DIAG notify_before idx=" << idx << sync_endl;
+          #endif
+              cv.notify_one();
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR notify_one this=%p idx=%zu\n", static_cast<void*>(this), idx);
+              std::fflush(stderr);
+              sync_cout << "WASM_DIAG notify_after idx=" << idx << sync_endl;
+          #endif
+          }'''
+          )
           PY
           
       - name: Build micro WASM engine
