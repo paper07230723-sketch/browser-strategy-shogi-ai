@@ -469,7 +469,8 @@ jobs:
             engine.postMessage("setoption name Threads value 1");
             engine.postMessage("setoption name EvalDir value evaldata");
             engine.postMessage("setoption name FV_SCALE value 24");
-
+            engine.postMessage("setoption name MinimumThinkingTime value 1");
+            engine.postMessage("setoption name RoundUpToFullSecond value false");
             const readyok = waitFor(
               line => line === "readyok",
               "readyok",
@@ -495,11 +496,11 @@ jobs:
 
             const bestmove = waitFor(
               line => /^bestmove\s+\S+/.test(line),
-              "bestmove after go depth 4",
+              "bestmove after go movetime 1000",
               30000
             );
 
-            engine.postMessage("go depth 4");
+            engine.postMessage("go movetime 1000");
 
             const result = await bestmove;
             console.log("USI_SMOKE_TEST_OK:", result);
