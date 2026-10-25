@@ -378,13 +378,22 @@ jobs:
             const bestmove = waitFor(
               line => /^bestmove\s+\S+/.test(line),
               "bestmove",
-              90000
+              30000
             );
 
             engine.postMessage("position startpos");
             engine.postMessage("go depth 1");
 
+            const stopWatchdog = setTimeout(() => {
+              originalWriteSync(
+                1,
+                "[WATCHDOG] sending stop after 10 seconds\n"
+              );
+              engine.postMessage("stop");
+            }, 10000);
+
             const result = await bestmove;
+            clearTimeout(stopWatchdog);
             console.log("USI_SMOKE_TEST_OK:", result);
 
             engine.postMessage("quit");
