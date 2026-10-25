@@ -237,6 +237,54 @@ jobs:
             }
 
             // 通常のメッセージ受信も併用する。
+            // USI コマンドが WASM エンジンに届くかを記録する。
+            const originalConsoleLog = console.log.bind(console);
+            const originalCcall = engine.ccall.bind(engine);
+
+            engine.ccall = function (
+              identifier,
+              returnType,
+              argTypes,
+              args
+            ) {
+              const isUsiCommand = identifier === "usi_command";
+              const command = args && args[0];
+              const startedAt = Date.now();
+
+              if (isUsiCommand) {
+                originalWriteSync(
+                  1,
+                  `[USI_CCALL_BEGIN] ${String(command)}\n`
+                );
+              }
+
+              try {
+                const result = originalCcall(
+                  identifier,
+                  returnType,
+                  argTypes,
+                  args
+                );
+
+                if (isUsiCommand) {
+                  originalWriteSync(
+                    1,
+                    `[USI_CCALL_END] ${String(command)} => ${String(result)} (${Date.now() - startedAt}ms)\n`
+                  );
+                }
+
+                return result;
+              } catch (error) {
+                if (isUsiCommand) {
+                  originalWriteSync(
+                    1,
+                    `[USI_CCALL_THROW] ${String(command)} => ${String(error)}\n`
+                  );
+                }
+
+                throw error;
+              }
+            };
             engine.addMessageListener(line => {
               const text = String(line).trim();
               originalConsoleLog("ENGINE:", text);
