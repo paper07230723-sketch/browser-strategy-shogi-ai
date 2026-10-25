@@ -140,7 +140,12 @@ jobs:
           replace_once(
               "thread.cpp",
               "        cv.wait(lk, [&] { return searching; });\n\n        if (exit)\n            return;",
-              "        cv.wait(lk, [&] { return searching; });\n#if defined(__EMSCRIPTEN__)\n        sync_cout << \"WASM_DIAG idle_wait_return idx=\" << idx << \" searching=\" << searching << \" exit=\" << exit << sync_endl;\n#endif\n\n        if (exit)\n            return;"
+              "#if defined(__EMSCRIPTEN__)\n        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;\n#endif\n        cv.wait(lk, [&] { return searching; });\n#if defined(__EMSCRIPTEN__)\n        sync_cout << \"WASM_DIAG idle_wait_return idx=\" << idx << \" searching=\" << searching << \" exit=\" << exit << sync_endl;\n#endif\n\n        if (exit)\n            return;"
+          )
+          replace_once(
+              "thread.cpp",
+              "void Thread::run_custom_job(std::function<void()> f) {\n    {\n        std::unique_lock<std::mutex> lk(mutex);\n        cv.wait(lk, [&] { return !searching; });\n        jobFunc   = std::move(f);\n        searching = true;\n    }\n    cv.notify_one();\n}",
+              "void Thread::run_custom_job(std::function<void()> f) {\n    {\n        std::unique_lock<std::mutex> lk(mutex);\n        cv.wait(lk, [&] { return !searching; });\n        jobFunc   = std::move(f);\n        searching = true;\n    }\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_before idx=\" << idx << sync_endl;\n#endif\n    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif\n}"
           )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           PY
