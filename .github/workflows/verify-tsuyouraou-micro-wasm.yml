@@ -182,7 +182,7 @@ jobs:
               "    cv.notify_all();\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR notify_all idx=%zu\\n\", idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif"
           )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
-                    replace_once(
+          replace_once(
               "thread.cpp",
               "        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;",
               "        std::fprintf(stderr, \"WASM_DIAG_STDERR idle_wait_begin this=%p idx=%zu\\n\", static_cast<void*>(this), idx);\n        std::fflush(stderr);\n        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;"
