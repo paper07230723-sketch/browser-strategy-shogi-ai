@@ -176,6 +176,11 @@ jobs:
               "#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG worker_start_searching\" << sync_endl;\n#endif",
               "#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR worker_start_searching\\n\");\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG worker_start_searching\" << sync_endl;\n#endif"
           )
+          replace_once(
+              "thread.cpp",
+              "    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif",
+              "    cv.notify_all();\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR notify_all idx=%zu\\n\", idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif"
+          )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           PY
           
