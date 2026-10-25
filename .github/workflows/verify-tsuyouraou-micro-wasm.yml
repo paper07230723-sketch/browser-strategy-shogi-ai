@@ -147,6 +147,35 @@ jobs:
               "void Thread::run_custom_job(std::function<void()> f) {\n    {\n        std::unique_lock<std::mutex> lk(mutex);\n        cv.wait(lk, [&] { return !searching; });\n        jobFunc   = std::move(f);\n        searching = true;\n    }\n    cv.notify_one();\n}",
               "void Thread::run_custom_job(std::function<void()> f) {\n    {\n        std::unique_lock<std::mutex> lk(mutex);\n        cv.wait(lk, [&] { return !searching; });\n        jobFunc   = std::move(f);\n        searching = true;\n    }\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_before idx=\" << idx << sync_endl;\n#endif\n    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif\n}"
           )
+          replace_once(
+              "thread.cpp",
+              "#include <cmath>     // std::abs",
+              "#include <cmath>     // std::abs\n#include <cstdio>"
+          )
+
+          replace_once(
+              search_file,
+              "#include <sstream>",
+              "#include <cstdio>\n#include <sstream>"
+          )
+
+          replace_once(
+              "thread.cpp",
+              "        cv.wait(lk, [&] { return searching; });\n#if defined(__EMSCRIPTEN__)\n        sync_cout << \"WASM_DIAG idle_wait_return idx=\" << idx << \" searching=\" << searching << \" exit=\" << exit << sync_endl;\n#endif",
+              "        cv.wait(lk, [&] { return searching; });\n#if defined(__EMSCRIPTEN__)\n        std::fprintf(stderr, \"WASM_DIAG_STDERR wait_return idx=%zu searching=%d exit=%d\\n\", idx, int(searching), int(exit));\n        std::fflush(stderr);\n        sync_cout << \"WASM_DIAG idle_wait_return idx=\" << idx << \" searching=\" << searching << \" exit=\" << exit << sync_endl;\n#endif"
+          )
+
+          replace_once(
+              "thread.cpp",
+              "#if defined(__EMSCRIPTEN__)\n            sync_cout << \"WASM_DIAG idle_job_begin idx=\" << idx << sync_endl;\n#endif",
+              "#if defined(__EMSCRIPTEN__)\n            std::fprintf(stderr, \"WASM_DIAG_STDERR idle_job_begin idx=%zu\\n\", idx);\n            std::fflush(stderr);\n            sync_cout << \"WASM_DIAG idle_job_begin idx=\" << idx << sync_endl;\n#endif"
+          )
+
+          replace_once(
+              search_file,
+              "#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG worker_start_searching\" << sync_endl;\n#endif",
+              "#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR worker_start_searching\\n\");\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG worker_start_searching\" << sync_endl;\n#endif"
+          )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           PY
           
