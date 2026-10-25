@@ -163,7 +163,7 @@ jobs:
             const engine = await createEngine({
               locateFile: file => path.join(__dirname, file)
             });
-                        const lines = [];
+            const lines = [];
             const waiters = [];
 
             // postRun より先にメッセージ受信を登録する。
