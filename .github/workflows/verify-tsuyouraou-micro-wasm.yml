@@ -13,7 +13,7 @@ concurrency:
   group: tuyouraou-micro-wasm
   cancel-in-progress: true
 
-jobs:
+jobs:      
   build-micro:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -79,6 +79,62 @@ jobs:
              "$eval_dir"/tag.json \
              "$GITHUB_WORKSPACE/output/evaldata/"
              
+      - name: Add temporary WASM search diagnostics
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(filename, old, new):
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8-sig")
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f"ERROR: {filename}: expected 1 match, got {count}"
+                  )
+              path.write_text(
+                  source.replace(old, new, 1),
+                  encoding="utf-8"
+              )
+
+          replace_once(
+              "thread.cpp",
+              "Search::LimitsType limits) {\n\n    main_thread()->wait_for_search_finished();",
+              "Search::LimitsType limits) {\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG start_thinking_enter\" << sync_endl;\n#endif\n\n    main_thread()->wait_for_search_finished();"
+          )
+
+          replace_once(
+              "thread.cpp",
+              "    for (auto&& th : threads)\n        th->wait_for_search_finished();\n\n    main_thread()->start_searching();",
+              "    for (auto&& th : threads)\n        th->wait_for_search_finished();\n\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG setup_jobs_finished\" << sync_endl;\n    sync_cout << \"WASM_DIAG scheduling_main_search\" << sync_endl;\n#endif\n    main_thread()->start_searching();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG main_search_scheduled\" << sync_endl;\n#endif"
+          )
+
+          replace_once(
+              "thread.cpp",
+              "        if (job)\n            job();",
+              "        if (job) {\n#if defined(__EMSCRIPTEN__)\n            sync_cout << \"WASM_DIAG idle_job_begin idx=\" << idx << sync_endl;\n#endif\n            job();\n#if defined(__EMSCRIPTEN__)\n            sync_cout << \"WASM_DIAG idle_job_end idx=\" << idx << sync_endl;\n#endif\n        }"
+          )
+
+          search_file = "engine/yaneuraou-engine/yaneuraou-search.cpp"
+
+          replace_once(
+              search_file,
+              "void Search::YaneuraOuWorker::start_searching() {\n\n#if defined(USE_SFNN)",
+              "void Search::YaneuraOuWorker::start_searching() {\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG worker_start_searching\" << sync_endl;\n#endif\n\n#if defined(USE_SFNN)"
+          )
+
+          replace_once(
+              search_file,
+              "    uciPvSent = iterative_deepening();  // main thread start searching",
+              "#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG iterative_deepening_enter\" << sync_endl;\n#endif\n    uciPvSent = iterative_deepening();  // main thread start searching\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG iterative_deepening_return\" << sync_endl;\n#endif"
+          )
+
+          print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
+          PY
+          
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
