@@ -37,7 +37,7 @@ jobs:
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@v16
         with:
-          version: 4.0.23
+          version: 6.0.7
 
       - name: Verify toolchain
         run: |
@@ -179,7 +179,7 @@ jobs:
           replace_once(
               "thread.cpp",
               "    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif",
-              "    cv.notify_all();\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR notify_all idx=%zu\\n\", idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif"
+              "    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR notify_one idx=%zu\\n\", idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif"
           )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           replace_once(
@@ -196,8 +196,8 @@ jobs:
 
           replace_once(
               "thread.cpp",
-              "std::fprintf(stderr, \"WASM_DIAG_STDERR notify_all idx=%zu\\n\", idx);",
-              "std::fprintf(stderr, \"WASM_DIAG_STDERR notify_all this=%p idx=%zu\\n\", static_cast<void*>(this), idx);"
+              "std::fprintf(stderr, \"WASM_DIAG_STDERR notify_one idx=%zu\\n\", idx);",
+              "std::fprintf(stderr, \"WASM_DIAG_STDERR notify_one this=%p idx=%zu\\n\", static_cast<void*>(this), idx);"
           )
 
           replace_once(
