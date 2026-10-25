@@ -257,7 +257,14 @@ jobs:
               engine.postMessage.toString().slice(0, 200)
             );
 
-            engine.FS.mkdir("/evaldata");
+            const evalDirs = [
+              "/evaldata",
+              path.join(__dirname, "evaldata")
+            ];
+
+            for (const dir of evalDirs) {
+              engine.FS.mkdirTree(dir);
+            }
 
             for (const file of [
               "nn.bin",
@@ -265,10 +272,13 @@ jobs:
               "eval_options.txt",
               "tag.json"
             ]) {
-              engine.FS.writeFile(
-                "/evaldata/" + file,
-                fs.readFileSync(path.join(__dirname, "evaldata", file))
+              const data = fs.readFileSync(
+                path.join(__dirname, "evaldata", file)
               );
+
+              for (const dir of evalDirs) {
+                engine.FS.writeFile(path.join(dir, file), data);
+              }
             }
 
             const usiok = waitFor(
