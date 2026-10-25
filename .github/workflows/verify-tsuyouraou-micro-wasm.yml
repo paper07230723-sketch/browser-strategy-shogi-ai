@@ -257,13 +257,28 @@ jobs:
               engine.postMessage.toString().slice(0, 200)
             );
 
+            function ensureDir(dir) {
+              const normalized = path.posix.resolve("/", dir);
+              let current = "/";
+
+              for (const part of normalized.split("/").filter(Boolean)) {
+                current = path.posix.join(current, part);
+
+                try {
+                  engine.FS.stat(current);
+                } catch {
+                  engine.FS.mkdir(current);
+                }
+              }
+            }
+
             const evalDirs = [
               "/evaldata",
               path.join(__dirname, "evaldata")
             ];
 
             for (const dir of evalDirs) {
-              engine.FS.mkdirTree(dir);
+              ensureDir(dir);
             }
 
             for (const file of [
@@ -277,7 +292,10 @@ jobs:
               );
 
               for (const dir of evalDirs) {
-                engine.FS.writeFile(path.join(dir, file), data);
+                engine.FS.writeFile(
+                  path.posix.join(dir, file),
+                  data
+                );
               }
             }
 
