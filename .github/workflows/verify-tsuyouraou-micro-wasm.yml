@@ -495,11 +495,11 @@ jobs:
 
             const bestmove = waitFor(
               line => /^bestmove\s+\S+/.test(line),
-              "bestmove after go nodes 1",
+              "bestmove after go depth 2",
               30000
             );
 
-            engine.postMessage("go nodes 1");
+            engine.postMessage("go depth 2");
 
             const result = await bestmove;
             console.log("USI_SMOKE_TEST_OK:", result);
