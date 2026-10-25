@@ -78,39 +78,7 @@ jobs:
              "$eval_dir"/eval_options.txt \
              "$eval_dir"/tag.json \
              "$GITHUB_WORKSPACE/output/evaldata/"
-      - name: Keep upstream WASM thread code unchanged
-        run: |
-          echo "Using pinned upstream thread.cpp without local workaround"
-          from pathlib import Path
-
-          p = Path("thread.cpp")
-          s = p.read_text(encoding="utf-8")
-          marker = "// 生成したスレッドに対してThread::clear_worker()を呼び出す。"
-
-          if s.count(marker) != 1:
-              raise SystemExit("ERROR: 対象箇所を一意に特定できません")
-
-          start = s.index(marker)
-          end_marker = "main_thread()->wait_for_search_finished();"
-          end = s.find(end_marker, start)
-
-          if end < 0:
-              raise SystemExit("ERROR: 待機処理が見つかりません")
-
-          end += len(end_marker)
-          old = s[start:end]
-
-          if old.count("clear();") != 1:
-              raise SystemExit("ERROR: clear() の位置が想定と異なります")
-
-          replacement = """#if !defined(__EMSCRIPTEN__)
-                  clear();
-                  main_thread()->wait_for_search_finished();
-          #endif"""
-
-          p.write_text(s[:start] + replacement + s[end:], encoding="utf-8")
-          print("WASM_STARTUP_WORKAROUND_APPLIED")
-          PY
+             
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
