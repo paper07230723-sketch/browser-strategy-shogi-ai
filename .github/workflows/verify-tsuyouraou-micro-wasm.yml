@@ -195,15 +195,30 @@ jobs:
             });
           }
 
-          // エンジン起動前からコンソール出力を捕捉する。
-          const originalConsoleLog = console.log.bind(console);
+          // Emscripten の Node.js 標準出力を直接捕捉する。
+          const originalWriteSync = fs.writeSync.bind(fs);
+          let stdoutCaptureBuffer = "";
 
-          console.log = (...args) => {
-            originalConsoleLog(...args);
+          fs.writeSync = function (fd, data, ...args) {
+            const result = originalWriteSync(fd, data, ...args);
 
-            if (args.length === 1 && typeof args[0] === "string") {
-              recordLine(args[0]);
+            if (fd === 1 && typeof data === "string") {
+              stdoutCaptureBuffer += data;
+
+              let newlineIndex;
+              while (
+                (newlineIndex = stdoutCaptureBuffer.indexOf("\n")) !== -1
+              ) {
+                const line = stdoutCaptureBuffer.slice(0, newlineIndex).trim();
+                stdoutCaptureBuffer = stdoutCaptureBuffer.slice(newlineIndex + 1);
+
+                if (line) {
+                  recordLine(line);
+                }
+              }
             }
+
+            return result;
           };
 
           const createEngine = require("./yaneuraou.cjs");
