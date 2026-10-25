@@ -181,6 +181,11 @@ jobs:
               "    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif",
               "    cv.notify_one();\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR notify_one idx=%zu\\n\", idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG notify_after idx=\" << idx << sync_endl;\n#endif"
           )
+          replace_once(
+              "thread.cpp",
+              "void Thread::start_searching() {\n    assert(worker != nullptr);\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR start_searching_request this=%p idx=%zu\\n\", static_cast<void*>(this), idx);\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG start_searching_request idx=\" << idx << sync_endl;\n#endif\n    run_custom_job([this]() { worker->start_searching(); });\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG start_searching_queued idx=\" << idx << sync_endl;\n#endif\n}",
+              "void Thread::start_searching() {\n    assert(worker != nullptr);\n#if defined(__EMSCRIPTEN__)\n    std::fprintf(stderr, \"WASM_DIAG_STDERR start_searching_request this=%p idx=%zu exit=%d\\n\", static_cast<void*>(this), idx, int(exit));\n    std::fflush(stderr);\n    sync_cout << \"WASM_DIAG start_searching_request idx=\" << idx << sync_endl;\n    if (idx == 0 && !exit) {\n        sync_cout << \"WASM_DIAG direct_main_search_enter\" << sync_endl;\n        worker->start_searching();\n        sync_cout << \"WASM_DIAG direct_main_search_return\" << sync_endl;\n        return;\n    }\n#endif\n    run_custom_job([this]() { worker->start_searching(); });\n#if defined(__EMSCRIPTEN__)\n    sync_cout << \"WASM_DIAG start_searching_queued idx=\" << idx << sync_endl;\n#endif\n}"
+          )
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           replace_once(
               "thread.cpp",
