@@ -340,25 +340,28 @@ jobs:
             await readyok;
             console.log("USI_READY_OK");
 
-            const bestmove = waitFor(
-              line => /^bestmove\s+\S+/.test(line),
-              "bestmove",
+            const evalLine = waitFor(
+              line => /^eval\s*=/.test(line),
+              "eval command",
               30000
             );
 
-            engine.postMessage("position startpos");
-            engine.postMessage("go depth 1");
+            engine.postMessage("e");
 
-            const stopWatchdog = setTimeout(() => {
-              originalWriteSync(
-                1,
-                "[WATCHDOG] sending stop after 10 seconds\n"
-              );
-              engine.postMessage("stop");
-            }, 10000);
+            const evalResult = await evalLine;
+            console.log("USI_EVAL_OK:", evalResult);
+
+            engine.postMessage("position startpos");
+
+            const bestmove = waitFor(
+              line => /^bestmove\s+\S+/.test(line),
+              "bestmove after go nodes 1",
+              30000
+            );
+
+            engine.postMessage("go nodes 1");
 
             const result = await bestmove;
-            clearTimeout(stopWatchdog);
             console.log("USI_SMOKE_TEST_OK:", result);
 
             engine.postMessage("quit");
