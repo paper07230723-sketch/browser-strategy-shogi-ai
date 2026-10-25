@@ -78,12 +78,9 @@ jobs:
              "$eval_dir"/eval_options.txt \
              "$eval_dir"/tag.json \
              "$GITHUB_WORKSPACE/output/evaldata/"
-      - name: Apply provisional WASM startup workaround
-        working-directory: upstream/source
-        shell: bash
+      - name: Keep upstream WASM thread code unchanged
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
+          echo "Using pinned upstream thread.cpp without local workaround"
           from pathlib import Path
 
           p = Path("thread.cpp")
