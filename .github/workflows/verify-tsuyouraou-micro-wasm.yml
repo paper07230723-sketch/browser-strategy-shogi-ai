@@ -45,7 +45,62 @@ jobs:
           em++ --version
           node --version
           python3 --version
+      - name: Diagnostic - condition_variable wake test
+        shell: bash
+        run: |
+          set -euo pipefail
 
+          cat > "$RUNNER_TEMP/cv-smoke.cpp" <<'CPP'
+          #include <condition_variable>
+          #include <cstdio>
+          #include <mutex>
+          #include <thread>
+
+          int main() {
+              std::mutex mutex;
+              std::condition_variable cv;
+              std::condition_variable enteredCv;
+              bool entered = false;
+              bool ready = false;
+
+              std::thread worker([&]() {
+                  std::unique_lock<std::mutex> lock(mutex);
+                  entered = true;
+                  enteredCv.notify_one();
+
+                  std::fprintf(stderr, "CV_TEST_WORKER_WAITING\n");
+                  std::fflush(stderr);
+
+                  cv.wait(lock, [&]() { return ready; });
+
+                  std::fprintf(stderr, "CV_TEST_WORKER_WOKE\n");
+                  std::fflush(stderr);
+              });
+
+              {
+                  std::unique_lock<std::mutex> lock(mutex);
+                  enteredCv.wait(lock, [&]() { return entered; });
+                  ready = true;
+              }
+
+              cv.notify_one();
+              worker.join();
+
+              std::fprintf(stderr, "CV_TEST_OK\n");
+              return 0;
+          }
+          CPP
+
+          em++ "$RUNNER_TEMP/cv-smoke.cpp" \
+            -O2 \
+            -pthread \
+            -sPTHREAD_POOL_SIZE=1 \
+            -sPTHREAD_POOL_SIZE_STRICT=1 \
+            -sEXIT_RUNTIME=1 \
+            -o "$RUNNER_TEMP/cv-smoke.js"
+
+          echo "CV_TEST_BUILD_OK"
+          timeout 20s node "$RUNNER_TEMP/cv-smoke.js"
       - name: Download and verify micro evaluation
         shell: bash
         run: |
