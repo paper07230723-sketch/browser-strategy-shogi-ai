@@ -665,7 +665,7 @@ jobs:
           )
 
           print("THREAD_CV_SPLIT_PATCHED")
-          PY          
+          PY
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
