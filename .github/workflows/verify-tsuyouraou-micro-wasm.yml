@@ -259,7 +259,7 @@ jobs:
 
           echo "CV_QUEUE_BUILD_OK"
           timeout 30s node "$RUNNER_TEMP/cv-job-queue.js"
-        - name: Diagnostic - emulated thread job lifecycle
+      - name: Diagnostic - emulated thread job lifecycle
         shell: bash
         run: |
           set -euo pipefail
