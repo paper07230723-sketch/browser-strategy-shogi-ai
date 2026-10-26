@@ -750,6 +750,66 @@ jobs:
           path.write_text(source, encoding="utf-8")
           print("IDLE_LOOP_POLL_DIAGNOSTIC_PATCHED")
           PY
+      - name: Diagnostic - log idle thread wake state
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("thread.cpp")
+          source = path.read_text(encoding="utf-8")
+
+          def replace_once(old, new):
+              global source
+              count = source.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f"ERROR: expected one match, got {count}: {old}"
+                  )
+              source = source.replace(old, new, 1)
+
+          replace_once(
+              "        cvFinished.notify_all();  // Wake completion waiters",
+              """        cvFinished.notify_all();  // Wake completion waiters
+          #if defined(__EMSCRIPTEN__)
+                  std::fprintf(
+                      stderr,
+                      "WASM_DIAG idle_iteration_top this=%p idx=%zu exit=%d queued_job=%d\\n",
+                      static_cast<void*>(this), idx, int(exit), int(bool(jobFunc))
+                  );
+                  std::fflush(stderr);
+          #endif"""
+          )
+
+          replace_once(
+              "        while (!searching) {",
+              "        unsigned int diagPollCount = 0;\\n        while (!searching) {"
+          )
+
+          replace_once(
+              "const auto status = cv.wait_for(lk, std::chrono::milliseconds(100));",
+              """const auto status = cv.wait_for(lk, std::chrono::milliseconds(100));
+                  ++diagPollCount;
+          #if defined(__EMSCRIPTEN__)
+                  if (searching ||
+                      (status != std::cv_status::timeout && diagPollCount <= 8) ||
+                      diagPollCount % 10 == 0) {
+                      std::fprintf(
+                          stderr,
+                          "WASM_DIAG idle_poll_return this=%p idx=%zu count=%u status=%d searching=%d exit=%d queued_job=%d\\n",
+                          static_cast<void*>(this), idx, diagPollCount,
+                          int(status), int(searching), int(exit), int(bool(jobFunc))
+                      );
+                      std::fflush(stderr);
+                  }
+          #endif"""
+          )
+
+          path.write_text(source, encoding="utf-8")
+          print("IDLE_THREAD_WAKE_DIAGNOSTICS_PATCHED")
+          PY
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
