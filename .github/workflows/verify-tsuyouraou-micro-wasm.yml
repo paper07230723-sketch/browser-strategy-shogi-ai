@@ -810,6 +810,40 @@ jobs:
           path.write_text(source, encoding="utf-8")
           print("IDLE_THREAD_WAKE_DIAGNOSTICS_PATCHED")
           PY
+      - name: Diagnostic - log before timed wait
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("thread.cpp")
+          source = path.read_text(encoding="utf-8")
+
+          old = "const auto status = cv.wait_for(lk, std::chrono::milliseconds(100));"
+          if source.count(old) != 1:
+              raise SystemExit(
+                  f"ERROR: expected one timed wait, got {source.count(old)}"
+              )
+
+          new = """#if defined(__EMSCRIPTEN__)
+                  if (diagPollCount == 0) {
+                      std::fprintf(
+                          stderr,
+                          "WASM_DIAG idle_poll_enter this=%p idx=%zu searching=%d exit=%d queued_job=%d\\n",
+                          static_cast<void*>(this), idx, int(searching),
+                          int(exit), int(bool(jobFunc))
+                      );
+                      std::fflush(stderr);
+                  }
+          #endif
+          const auto status = cv.wait_for(lk, std::chrono::milliseconds(100));"""
+
+          source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
+          print("IDLE_POLL_ENTRY_DIAGNOSTIC_PATCHED")
+          PY          
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
