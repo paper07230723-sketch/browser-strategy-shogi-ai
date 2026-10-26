@@ -259,6 +259,136 @@ jobs:
 
           echo "CV_QUEUE_BUILD_OK"
           timeout 30s node "$RUNNER_TEMP/cv-job-queue.js"
+        - name: Diagnostic - emulated thread job lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > "$RUNNER_TEMP/thread-lifecycle.cpp" <<'CPP'
+          #include <atomic>
+          #include <chrono>
+          #include <condition_variable>
+          #include <cstdio>
+          #include <functional>
+          #include <mutex>
+          #include <thread>
+          #include <utility>
+
+          class ThreadLike {
+          public:
+              ThreadLike() : worker(&ThreadLike::idle_loop, this) {}
+
+              ~ThreadLike() {
+                  {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      cvFinished.wait(lock, [this]() {
+                          return !searching;
+                      });
+                      exit = true;
+                      searching = true;
+                  }
+                  cv.notify_one();
+                  worker.join();
+              }
+
+              void run_job(std::function<void()> job) {
+                  {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      cvFinished.wait(lock, [this]() {
+                          return !searching;
+                      });
+                      jobFunc = std::move(job);
+                      searching = true;
+                  }
+                  cv.notify_one();
+              }
+
+              void wait_finished() {
+                  std::unique_lock<std::mutex> lock(mutex);
+                  cvFinished.wait(lock, [this]() {
+                      return !searching;
+                  });
+              }
+
+          private:
+              void idle_loop() {
+                  while (true) {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      searching = false;
+                      cvFinished.notify_all();
+
+                      while (!searching) {
+                          cv.wait_for(
+                              lock, std::chrono::milliseconds(100)
+                          );
+                      }
+
+                      if (exit)
+                          return;
+
+                      std::function<void()> job = std::move(jobFunc);
+                      jobFunc = nullptr;
+                      lock.unlock();
+
+                      if (job)
+                          job();
+                  }
+              }
+
+              std::mutex mutex;
+              std::condition_variable cv;
+              std::condition_variable cvFinished;
+              std::function<void()> jobFunc;
+              bool exit = false;
+              bool searching = true;
+              std::thread worker;
+          };
+
+          int main() {
+              for (int cycle = 1; cycle <= 32; ++cycle) {
+                  ThreadLike thread;
+                  std::atomic<int> completed{0};
+
+                  for (int job = 1; job <= 4; ++job) {
+                      thread.run_job([&completed, job]() {
+                          completed.store(job);
+                      });
+
+                      thread.wait_finished();
+
+                      if (completed.load() != job) {
+                          std::fprintf(
+                              stderr,
+                              "THREAD_LIFECYCLE_FAILED cycle=%d job=%d\n",
+                              cycle, job
+                          );
+                          return 1;
+                      }
+                  }
+
+                  if (cycle % 8 == 0) {
+                      std::fprintf(
+                          stderr, "THREAD_LIFECYCLE_PROGRESS %d\n", cycle
+                      );
+                      std::fflush(stderr);
+                  }
+              }
+
+              std::fprintf(stderr, "THREAD_LIFECYCLE_STRESS_OK\n");
+              return 0;
+          }
+          CPP
+
+          em++ "$RUNNER_TEMP/thread-lifecycle.cpp" \
+            -O2 \
+            -pthread \
+            -sPTHREAD_POOL_SIZE=1 \
+            -sPTHREAD_POOL_SIZE_STRICT=1 \
+            -sEXIT_RUNTIME=1 \
+            -o "$RUNNER_TEMP/thread-lifecycle.js"
+
+          echo "THREAD_LIFECYCLE_BUILD_OK"
+          timeout 30s node "$RUNNER_TEMP/thread-lifecycle.js"
       - name: Download and verify micro evaluation
         shell: bash
         run: |
