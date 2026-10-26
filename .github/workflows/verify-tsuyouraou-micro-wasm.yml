@@ -705,7 +705,51 @@ jobs:
           path.write_text("".join(lines), encoding="utf-8")
           print("IDLE_LOOP_TRACE_OUTPUT_REMOVED")
           PY
+      - name: Diagnostic - poll idle loop predicate
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
 
+          path = Path("thread.cpp")
+          source = path.read_text(encoding="utf-8")
+
+          include = "#include <algorithm> // std::count"
+          if source.count(include) != 1:
+              raise SystemExit("ERROR: could not locate standard include block")
+          if "#include <chrono>" not in source:
+              source = source.replace(
+                  include,
+                  include + "\n#include <chrono>",
+                  1,
+              )
+
+          old = "        cv.wait(lk, [&] { return searching; });"
+          if source.count(old) != 1:
+              raise SystemExit(
+                  f"ERROR: expected one idle-loop wait, got {source.count(old)}"
+              )
+
+          new = """        while (!searching) {
+              const auto status = cv.wait_for(lk, std::chrono::milliseconds(100));
+              if (status == std::cv_status::timeout) {
+          #if defined(__EMSCRIPTEN__)
+                  std::fprintf(
+                      stderr,
+                      "WASM_DIAG idle_poll_timeout idx=%zu searching=%d exit=%d queued_job=%d\\n",
+                      idx, int(searching), int(exit), int(bool(jobFunc))
+                  );
+                  std::fflush(stderr);
+          #endif
+              }
+          }"""
+
+          source = source.replace(old, new, 1)
+          path.write_text(source, encoding="utf-8")
+          print("IDLE_LOOP_POLL_DIAGNOSTIC_PATCHED")
+          PY
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
