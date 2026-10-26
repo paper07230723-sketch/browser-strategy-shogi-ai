@@ -101,6 +101,62 @@ jobs:
 
           echo "CV_TEST_BUILD_OK"
           timeout 20s node "$RUNNER_TEMP/cv-smoke.js"
+      - name: Diagnostic - condition_variable thread reuse stress
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > "$RUNNER_TEMP/cv-reuse-stress.cpp" <<'CPP'
+          #include <condition_variable>
+          #include <cstdio>
+          #include <mutex>
+          #include <thread>
+
+          int main() {
+              for (int i = 0; i < 64; ++i) {
+                  std::mutex mutex;
+                  std::condition_variable cv;
+                  std::condition_variable enteredCv;
+                  bool entered = false;
+                  bool ready = false;
+
+                  std::thread worker([&]() {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      entered = true;
+                      enteredCv.notify_one();
+                      cv.wait(lock, [&]() { return ready; });
+                  });
+
+                  {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      enteredCv.wait(lock, [&]() { return entered; });
+                      ready = true;
+                  }
+
+                  cv.notify_one();
+                  worker.join();
+
+                  if ((i + 1) % 8 == 0) {
+                      std::fprintf(stderr, "CV_REUSE_PROGRESS %d\n", i + 1);
+                      std::fflush(stderr);
+                  }
+              }
+
+              std::fprintf(stderr, "CV_REUSE_STRESS_OK\n");
+              return 0;
+          }
+          CPP
+
+          em++ "$RUNNER_TEMP/cv-reuse-stress.cpp" \
+            -O2 \
+            -pthread \
+            -sPTHREAD_POOL_SIZE=1 \
+            -sPTHREAD_POOL_SIZE_STRICT=1 \
+            -sEXIT_RUNTIME=1 \
+            -o "$RUNNER_TEMP/cv-reuse-stress.js"
+
+          echo "CV_REUSE_BUILD_OK"
+          timeout 30s node "$RUNNER_TEMP/cv-reuse-stress.js"
       - name: Download and verify micro evaluation
         shell: bash
         run: |
