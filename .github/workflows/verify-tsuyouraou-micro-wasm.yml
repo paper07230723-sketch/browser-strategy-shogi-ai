@@ -794,7 +794,14 @@ jobs:
               "cvFinished.notify_all();  // Wake completion waiters"
           )
 
-          print("THREAD_CV_SPLIT_PATCHED")
+          replace_in_function(
+              "thread.cpp",
+              "void Thread::run_custom_job(std::function<void()> f)",
+              "cv.notify_one();",
+              "cv.notify_all();"
+          )
+
+          print("THREAD_CV_SPLIT_NOTIFY_ALL_PATCHED")
           PY
           
       - name: Diagnostic - remove idle loop trace output
