@@ -579,7 +579,7 @@ jobs:
             console.log("USI_HANDSHAKE_OK");
 
             engine.postMessage("setoption name USI_Hash value 64");
-            engine.postMessage("setoption name Threads value 2");
+            engine.postMessage("setoption name Threads value 1");
             engine.postMessage("setoption name EvalDir value evaldata");
             engine.postMessage("setoption name FV_SCALE value 24");
             engine.postMessage("setoption name MinimumThinkingTime value 1");
