@@ -666,6 +666,46 @@ jobs:
 
           print("THREAD_CV_SPLIT_PATCHED")
           PY
+          
+      - name: Diagnostic - remove idle loop trace output
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("thread.cpp")
+          source = path.read_text(encoding="utf-8")
+
+          markers = [
+              "WASM_DIAG idle_wait_begin idx=",
+              "WASM_DIAG idle_wait_return idx=",
+              "WASM_DIAG idle_job_begin idx=",
+              "WASM_DIAG idle_job_end idx=",
+          ]
+
+          lines = source.splitlines(keepends=True)
+
+          for marker in markers:
+              matches = [
+                  line for line in lines
+                  if marker in line
+              ]
+              if len(matches) != 1:
+                  raise SystemExit(
+                      f"ERROR: expected one trace line for {marker}, "
+                      f"got {len(matches)}"
+                  )
+              lines = [
+                  line for line in lines
+                  if marker not in line
+              ]
+
+          path.write_text("".join(lines), encoding="utf-8")
+          print("IDLE_LOOP_TRACE_OUTPUT_REMOVED")
+          PY
+
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
