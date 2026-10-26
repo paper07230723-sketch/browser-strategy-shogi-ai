@@ -785,7 +785,7 @@ jobs:
 
           replace_once(
               "        while (!searching) {",
-              "        unsigned int diagPollCount = 0;\\n        while (!searching) {"
+              "        unsigned int diagPollCount = 0;" + chr(10) + "        while (!searching) {"
           )
 
           replace_once(
