@@ -597,7 +597,75 @@ jobs:
           #endif'''
           ) 
           PY
-          
+      - name: Diagnostic - separate worker and completion condition variables
+        working-directory: upstream/source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_in_function(filename, signature, old, new):
+              path = Path(filename)
+              source = path.read_text(encoding="utf-8")
+              start = source.find(signature)
+              if start < 0:
+                  raise SystemExit(f"ERROR: missing function: {signature}")
+
+              end = source.find("\n}", start)
+              if end < 0:
+                  raise SystemExit(f"ERROR: no function end: {signature}")
+              end += 2
+
+              function_text = source[start:end]
+              count = function_text.count(old)
+              if count != 1:
+                  raise SystemExit(
+                      f"ERROR: {signature}: expected 1 match, got {count}"
+                  )
+
+              function_text = function_text.replace(old, new, 1)
+              path.write_text(
+                  source[:start] + function_text + source[end:],
+                  encoding="utf-8"
+              )
+
+          header = Path("thread.h")
+          source = header.read_text(encoding="utf-8-sig")
+          old = "std::condition_variable   cv;"
+          if source.count(old) != 1:
+              raise SystemExit("ERROR: expected one cv member in thread.h")
+
+          source = source.replace(
+              old,
+              old + "\n    std::condition_variable cvFinished;",
+              1
+          )
+          header.write_text(source, encoding="utf-8")
+
+          replace_in_function(
+              "thread.cpp",
+              "void Thread::wait_for_search_finished()",
+              "cv.wait(lk, [&] { return !searching; });",
+              "cvFinished.wait(lk, [&] { return !searching; });"
+          )
+
+          replace_in_function(
+              "thread.cpp",
+              "void Thread::run_custom_job(std::function<void()> f)",
+              "cv.wait(lk, [&] { return !searching; });",
+              "cvFinished.wait(lk, [&] { return !searching; });"
+          )
+
+          replace_in_function(
+              "thread.cpp",
+              "void Thread::idle_loop()",
+              "cv.notify_one();  // Wake up anyone waiting for search finished",
+              "cvFinished.notify_all();  // Wake completion waiters"
+          )
+
+          print("THREAD_CV_SPLIT_PATCHED")
+          PY          
       - name: Build micro WASM engine
         working-directory: upstream/source
         shell: bash
