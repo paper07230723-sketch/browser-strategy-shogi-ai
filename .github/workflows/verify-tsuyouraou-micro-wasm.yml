@@ -37,7 +37,7 @@ jobs:
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@v16
         with:
-          version: 6.0.7
+          version: 6.0.13
 
       - name: Verify toolchain
         run: |
