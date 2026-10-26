@@ -157,6 +157,108 @@ jobs:
 
           echo "CV_REUSE_BUILD_OK"
           timeout 30s node "$RUNNER_TEMP/cv-reuse-stress.js"
+      - name: Diagnostic - persistent job queue
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > "$RUNNER_TEMP/cv-job-queue.cpp" <<'CPP'
+          #include <condition_variable>
+          #include <cstdio>
+          #include <mutex>
+          #include <thread>
+
+          int main() {
+              std::mutex mutex;
+              std::condition_variable cv;
+              std::condition_variable readyCv;
+              bool workerReady = false;
+              bool searching = false;
+              bool exitWorker = false;
+              int queuedJob = 0;
+              int completedJob = 0;
+
+              std::thread worker([&]() {
+                  while (true) {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      searching = false;
+
+                      if (!workerReady) {
+                          workerReady = true;
+                          readyCv.notify_one();
+                      }
+
+                      cv.notify_one();
+                      cv.wait(lock, [&]() { return searching; });
+
+                      if (exitWorker)
+                          return;
+
+                      const int job = queuedJob;
+                      lock.unlock();
+
+                      {
+                          std::lock_guard<std::mutex> doneLock(mutex);
+                          completedJob = job;
+                      }
+                  }
+              });
+
+              {
+                  std::unique_lock<std::mutex> lock(mutex);
+                  readyCv.wait(lock, [&]() { return workerReady; });
+              }
+
+              for (int i = 1; i <= 128; ++i) {
+                  {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      cv.wait(lock, [&]() { return !searching; });
+                      queuedJob = i;
+                      searching = true;
+                  }
+
+                  cv.notify_one();
+
+                  {
+                      std::unique_lock<std::mutex> lock(mutex);
+                      cv.wait(lock, [&]() {
+                          return !searching && completedJob >= i;
+                      });
+                  }
+
+                  if (i % 16 == 0) {
+                      std::fprintf(stderr, "CV_QUEUE_PROGRESS %d\n", i);
+                      std::fflush(stderr);
+                  }
+              }
+
+              {
+                  std::unique_lock<std::mutex> lock(mutex);
+                  cv.wait(lock, [&]() {
+                      return !searching && completedJob == 128;
+                  });
+                  exitWorker = true;
+                  searching = true;
+              }
+
+              cv.notify_one();
+              worker.join();
+
+              std::fprintf(stderr, "CV_QUEUE_STRESS_OK\n");
+              return 0;
+          }
+          CPP
+
+          em++ "$RUNNER_TEMP/cv-job-queue.cpp" \
+            -O2 \
+            -pthread \
+            -sPTHREAD_POOL_SIZE=1 \
+            -sPTHREAD_POOL_SIZE_STRICT=1 \
+            -sEXIT_RUNTIME=1 \
+            -o "$RUNNER_TEMP/cv-job-queue.js"
+
+          echo "CV_QUEUE_BUILD_OK"
+          timeout 30s node "$RUNNER_TEMP/cv-job-queue.js"
       - name: Download and verify micro evaluation
         shell: bash
         run: |
