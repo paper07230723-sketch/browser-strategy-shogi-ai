@@ -528,6 +528,21 @@ jobs:
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           replace_once(
               "thread.cpp",
+              "run_custom_job([this]() { worker->start_searching(); });",
+              r'''run_custom_job([this]() {
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_before idx=%zu\n", idx);
+              std::fflush(stderr);
+          #endif
+              worker->start_searching();
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_after idx=%zu\n", idx);
+              std::fflush(stderr);
+          #endif
+          });'''
+          )
+          replace_once(
+              "thread.cpp",
               "        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;",
               "        std::fprintf(stderr, \"WASM_DIAG_STDERR idle_wait_begin this=%p idx=%zu\\n\", static_cast<void*>(this), idx);\n        std::fflush(stderr);\n        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;"
           )
