@@ -527,17 +527,6 @@ jobs:
           
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           
-              r'''run_custom_job([this]() {
-          #if defined(__EMSCRIPTEN__)
-              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_before idx=%zu\n", idx);
-              std::fflush(stderr);
-          #endif
-              worker->start_searching();
-          #if defined(__EMSCRIPTEN__)
-              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_after idx=%zu\n", idx);
-              std::fflush(stderr);
-          #endif
-          });'''
           )
           replace_once(
               "thread.cpp",
