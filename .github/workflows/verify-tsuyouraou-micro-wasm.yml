@@ -527,7 +527,6 @@ jobs:
           
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
           
-          )
           replace_once(
               "thread.cpp",
               "        sync_cout << \"WASM_DIAG idle_wait_begin idx=\" << idx << sync_endl;",
