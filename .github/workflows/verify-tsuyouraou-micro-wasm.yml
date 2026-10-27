@@ -1002,7 +1002,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo "=== FINAL Thread::start_searching ==="
+          sed -n '/void Thread::start_searching()/,+28p' thread.cpp
 
+          echo "=== FINAL Thread::run_custom_job ==="
+          sed -n '/void Thread::run_custom_job(/,+22p' thread.cpp
+
+          echo "=== FINAL Thread::idle_loop ==="
+          sed -n '/void Thread::idle_loop()/,+55p' thread.cpp
           emmake make -j2 normal \
             YANEURAOU_EDITION=YANEURAOU_ENGINE_SFNN_ka2_2048_8_64_progress8 \
             TARGET_CPU=WASM \
