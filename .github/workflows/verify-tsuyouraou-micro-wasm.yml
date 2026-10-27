@@ -526,9 +526,7 @@ jobs:
           )
           
           print("WASM_SEARCH_DIAGNOSTICS_PATCHED")
-          replace_once(
-              "thread.cpp",
-              "run_custom_job([this]() { worker->start_searching(); });",
+          
               r'''run_custom_job([this]() {
           #if defined(__EMSCRIPTEN__)
               std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_before idx=%zu\n", idx);
@@ -740,7 +738,22 @@ jobs:
                   std::fprintf(stderr, "WASM_DIAG_STDERR idle_after_exit_check this=%p idx=%zu exit=%d searching=%d queued_job=%d\n", static_cast<void*>(this), idx, int(exit), int(searching), int(bool(jobFunc)));
                   std::fflush(stderr);
           #endif'''
-          ) 
+          )
+          replace_once(
+              "thread.cpp",
+              "run_custom_job([this]() { worker->start_searching(); });",
+              r'''run_custom_job([this]() {
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_before idx=%zu\n", idx);
+              std::fflush(stderr);
+          #endif
+              worker->start_searching();
+          #if defined(__EMSCRIPTEN__)
+              std::fprintf(stderr, "WASM_DIAG_STDERR search_job_lambda_after idx=%zu\n", idx);
+              std::fflush(stderr);
+          #endif
+          });'''
+          )
           PY
       - name: Diagnostic - separate worker and completion condition variables
         working-directory: upstream/source
