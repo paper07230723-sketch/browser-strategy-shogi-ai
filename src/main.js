@@ -791,7 +791,9 @@ function resumeGame() {
   if (!gameStarted || !gamePaused || gameOver) return;
 
   if (!engineReady || !engine) {
-    resumeRequestedAfterInit = true;
+  if (resumeRequestedAfterInit) return;
+
+  resumeRequestedAfterInit = true;
     message = 'エンジンを起動しています。';
     setEngineStatus('AIエンジン：再接続中');
     setAIStatus('対局再開準備中');
@@ -1241,6 +1243,7 @@ turnSelect.addEventListener('change', () => {
 startAiButton.type = 'button';
 startAiButton.disabled =
   gameOver ||
+  resumeRequestedAfterInit ||
   (gameStarted
     ? pauseRequested
     : (!engineReady || aiThinking));
