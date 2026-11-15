@@ -1761,7 +1761,7 @@ await new Promise((resolve) => {
         importScripts(event.data.url);
         self.postMessage({
           ok: true,
-          factorytype: typeof seif[${probeFactoryName}]
+          factorytype: typeof self[${probeFactoryName}]
         });
       } catch (error) {
         self.postMessage({
