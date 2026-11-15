@@ -813,10 +813,11 @@ function resumeGame() {
   }
 
   if (!clearPausedGameSession()) {
-    message = '保存データを削除できないため、再開を中止しました。';
-    render();
-    return;
-  }
+  resumeRequestedAfterInit = false;
+  message = '保存データを削除できないため、再開を中止しました。';
+  render();
+  return;
+}
 
   if (pauseWatchdog !== null) {
     clearTimeout(pauseWatchdog);
