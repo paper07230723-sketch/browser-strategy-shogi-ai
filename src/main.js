@@ -1142,10 +1142,10 @@ function createApp() {
 
 engineSelect.value = selectedEngineId;
 engineSelect.disabled =
-  (gameStarted && !gamePaused) || pauseRequested || gameOver;
+  (gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || gameOver;
 
 engineSelect.addEventListener('change', () => {
-  if ((gameStarted && !gamePaused) || pauseRequested || gameOver) {
+  if ((gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || gameOver) {
     engineSelect.value = selectedEngineId;
     return;
   }
@@ -1192,12 +1192,14 @@ engineSelect.addEventListener('change', () => {
 thinkTimeSelect.value = selectedThinkTime;
 thinkTimeSelect.disabled =
   (gameStarted && !gamePaused) ||
+  resumeRequestedAfterInit ||
   pauseRequested ||
   gameOver;
 
 thinkTimeSelect.addEventListener('change', () => {
   if (
     (gameStarted && !gamePaused) ||
+    resumeRequestedAfterInit ||
     pauseRequested ||
     gameOver
   ) {
