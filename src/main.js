@@ -770,20 +770,29 @@ function pauseGame() {
   try {
     engine.postMessage('stop');
   } catch (error) {
-    message = `停止指示に失敗しました：${error.message}`;
-  }
+  pauseRequested = false;
+  message = `停止指示に失敗しました：${error.message}`;
+  setEngineStatus('AIエンジン：停止指示失敗');
+  render();
+  return;
+}
 
   if (pauseWatchdog !== null) {
     clearTimeout(pauseWatchdog);
   }
 
   pauseWatchdog = window.setTimeout(() => {
-    if (!pauseRequested) return;
+  if (!pauseRequested) return;
 
-    message = 'エンジンの停止応答待ちです。盤面と設定はロックされています。';
-    setEngineStatus('AIエンジン：停止応答待ち');
-    render();
-  }, 15000);
+  pauseRequested = false;
+  pauseWatchdog = null;
+
+  message =
+    '停止応答がありません。AIの思考は継続中です。「対局を中断」を押して再試行してください。';
+
+  setEngineStatus('AIエンジン：停止応答待ち（再試行可能）');
+  render();
+}, 15000);
 
   render();
 }
