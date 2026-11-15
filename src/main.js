@@ -2044,6 +2044,7 @@ if (factoryType !== 'function') {
   } catch (error) {
     aiThinking = false;
     engineReady = false;
+    resumeRequestedAfterInit = false;
 
     const errorMessage =
       error?.message || String(error);
@@ -2132,6 +2133,9 @@ async function startEngineSafely({ resumePausedGame = false } = {}) {
   setAIStatus(
     'SharedArrayBufferが利用できないため、エンジンの起動を停止しました。'
   );
+  if (resumePausedGame) {
+  resumeRequestedAfterInit = false;
+}
 
   render();
 }
