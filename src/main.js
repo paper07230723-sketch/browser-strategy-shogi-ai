@@ -39,8 +39,90 @@ let selectedHandPiece = null;
 let pendingPromotion = null;
 let message = '先手の番です。動かす駒を選んでください。';
 let selectedThinkTime = '0秒';
+const ENGINE_CONFIGS = Object.freeze({
+  suishou: {
+    label: '水匠',
+    scriptPath: 'engine/sse42/yaneuraou.js',
+    factoryName: 'YaneuraOu_sse42',
+    evalDataPath: null,
+  },
+  mini: {
+    label: 'つようら王11mini',
+    scriptPath: 'engine/tsuyouraou-mini/yaneuraou.js',
+    factoryName: 'YaneuraOu_mini',
+    evalDataPath: 'engine/tsuyouraou-mini/evaldata',
+  },
+  micro: {
+    label: 'つようら王11micro',
+    scriptPath: 'engine/tsuyouraou-micro/yaneuraou.js',
+    factoryName: 'YaneuraOu_micro',
+    evalDataPath: 'engine/tsuyouraou-micro/evaldata',
+  },
+});
+
+const ENGINE_STORAGE_KEY = 'browser-strategy-shogi-ai-engine';
+const GAME_SESSION_STORAGE_KEY = 'browser-strategy-shogi-ai-session';
+const APP_SETTINGS_STORAGE_KEY =
+  'browser-strategy-shogi-ai-settings';
+
+const VALID_THINK_TIMES = [
+  '0秒', '1秒', '2秒', '3秒', '4秒', '5秒',
+];
+
+function loadAppSettings() {
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(APP_SETTINGS_STORAGE_KEY)
+    );
+
+    return {
+      playerColor:
+        saved?.playerColor === 'white' ? 'white' : 'black',
+      thinkTime:
+        VALID_THINK_TIMES.includes(saved?.thinkTime)
+          ? saved.thinkTime
+          : '0秒',
+    };
+  } catch {
+    return {
+      playerColor: 'black',
+      thinkTime: '0秒',
+    };
+  }
+}
+
+function saveAppSettings() {
+  try {
+    localStorage.setItem(
+      APP_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        playerColor,
+        thinkTime: selectedThinkTime,
+      })
+    );
+    return true;
+  } catch (error) {
+    console.error('対局設定の保存に失敗しました:', error);
+    return false;
+  }
+}
+
+const savedAppSettings = loadAppSettings();
+
+selectedThinkTime = savedAppSettings.thinkTime;
+
+function loadSelectedEngineId() {
+  try {
+    const saved = localStorage.getItem(ENGINE_STORAGE_KEY);
+    return Object.hasOwn(ENGINE_CONFIGS, saved) ? saved : 'suishou';
+  } catch {
+    return 'suishou';
+  }
+}
+
+let selectedEngineId = loadSelectedEngineId();
 let gameStarted = false;
-let playerColor = 'black';
+let playerColor = savedAppSettings.playerColor;
 let engine = null;
 let engineReady = false;
 let aiThinking = false;
@@ -50,6 +132,131 @@ let aiStatusText = 'AIの初期化中';
 let moveHistory = [];
 let ignoreNextBestmove = false;
 let gameOver = false;
+let gamePaused = false;
+let pauseRequested = false;
+let resumeRequestedAfterInit = false;
+let pauseWatchdog = null;
+function savePausedGameSession() {
+  const session = {
+    version: 1,
+    moves: [...moveHistory],
+    playerColor,
+    thinkTime: selectedThinkTime,
+    engineId: selectedEngineId,
+    gameStarted: true,
+    gamePaused: true,
+  };
+
+  try {
+    localStorage.setItem(
+      GAME_SESSION_STORAGE_KEY,
+      JSON.stringify(session)
+    );
+    return true;
+  } catch (error) {
+    console.error('対局状態の保存に失敗しました:', error);
+    return false;
+  }
+}
+
+function loadPausedGameSession() {
+  try {
+    const raw = localStorage.getItem(GAME_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+
+    const session = JSON.parse(raw);
+
+    const validMoves =
+      Array.isArray(session?.moves) &&
+      session.moves.length <= 512 &&
+      session.moves.every(
+        (usi) =>
+          typeof usi === 'string' &&
+          /^(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/.test(usi)
+      );
+
+    if (
+      session?.version !== 1 ||
+      session.gameStarted !== true ||
+      session.gamePaused !== true ||
+      !validMoves ||
+      !['black', 'white'].includes(session.playerColor) ||
+      !VALID_THINK_TIMES.includes(session.thinkTime) ||
+      !Object.hasOwn(ENGINE_CONFIGS, session.engineId)
+    ) {
+      return null;
+    }
+
+    return session;
+  } catch (error) {
+    console.warn('保存された対局状態を読み込めません:', error);
+    return null;
+  }
+}
+
+function clearPausedGameSession() {
+  try {
+    localStorage.removeItem(GAME_SESSION_STORAGE_KEY);
+    return true;
+  } catch (error) {
+    console.error('保存された対局状態の削除に失敗しました:', error);
+    return false;
+  }
+}
+function restorePausedGameSession() {
+  const session = loadPausedGameSession();
+  if (!session) return false;
+
+  try {
+    record.clear();
+
+    for (const usi of session.moves) {
+      const move = record.position.createMoveByUSI(usi);
+
+      if (!move || !record.append(move)) {
+        throw new Error(`棋譜を再生できません: ${usi}`);
+      }
+    }
+
+    moveHistory = [...session.moves];
+    playerColor = session.playerColor;
+    selectedThinkTime = session.thinkTime;
+    selectedEngineId = session.engineId;
+
+    gameStarted = true;
+    gamePaused = true;
+    pauseRequested = false;
+    resumeRequestedAfterInit = false;
+    aiThinking = false;
+    engineReady = false;
+    engine = null;
+    engineStage = 'idle';
+
+    clearSelection();
+
+    message =
+      '対局中断中です。エンジンを変更するか「対局再開」を押してください。';
+    engineStatusText = 'AIエンジン：停止中';
+    aiStatusText = '対局中断中';
+
+    return true;
+  } catch (error) {
+    console.error('対局状態の復元に失敗しました:', error);
+
+    record.clear();
+    moveHistory = [];
+    gameStarted = false;
+    gamePaused = false;
+    pauseRequested = false;
+
+    clearPausedGameSession();
+
+    message =
+      '保存された対局を復元できませんでした。新しい対局を開始してください。';
+
+    return false;
+  }
+}
 let gameOverTitle = '';
 let gameOverDetail = '';
 
@@ -146,6 +353,15 @@ function finishGame(winnerSource) {
   gameStarted = false;
   aiThinking = false;
   engineStage = 'idle';
+  gamePaused = false;
+  pauseRequested = false;
+  resumeRequestedAfterInit = false;
+  clearPausedGameSession();
+
+if (pauseWatchdog !== null) {
+  clearTimeout(pauseWatchdog);
+  pauseWatchdog = null;
+}
 
   gameOverTitle =
     winnerSource === 'human'
@@ -178,6 +394,15 @@ function returnToGameSetup() {
   gameStarted = false;
   aiThinking = false;
   engineStage = 'idle';
+  gamePaused = false;
+  pauseRequested = false;
+  resumeRequestedAfterInit = false;
+  clearPausedGameSession();
+
+if (pauseWatchdog !== null) {
+  clearTimeout(pauseWatchdog);
+  pauseWatchdog = null;
+}
 
   message =
     '先手・後手を選んで「対局を開始」を押してください。';
@@ -187,7 +412,7 @@ function returnToGameSetup() {
 }
 // 投了：対局開始前の状態に戻す
 function resignGame() {
-  if (!gameStarted) return;
+  if (!gameStarted || gamePaused || pauseRequested || gameOver) return;
 
   // AIが思考中なら停止し、遅れて届いた指し手を無視する
   if (aiThinking && engine) {
@@ -202,6 +427,15 @@ function resignGame() {
 
   aiThinking = false;
   engineStage = 'idle';
+  gamePaused = false;
+  pauseRequested = false;
+  resumeRequestedAfterInit = false;
+  clearPausedGameSession();
+
+if (pauseWatchdog !== null) {
+  clearTimeout(pauseWatchdog);
+  pauseWatchdog = null;
+}
   record.clear();
   moveHistory = [];
   clearSelection();
@@ -214,7 +448,16 @@ function resignGame() {
 
 // 待った：直前の人間とAIの着手を取り消す
 function takeBack() {
-  if (!gameStarted || aiThinking || pendingPromotion) return;
+  if (
+  !gameStarted ||
+  gamePaused ||
+  pauseRequested ||
+  aiThinking ||
+  pendingPromotion ||
+  gameOver
+) {
+  return;
+}
 
   // 先手なら最低2手、後手ならAIの初手も含めて最低3手必要
   const minimumMoves = playerColor === 'black' ? 2 : 3;
@@ -385,6 +628,9 @@ function finishMove() {
 }
 
 function commitMove(move, usi, source = 'human') {
+  if (gamePaused || pauseRequested) {
+  return false;
+}
   if (!move || !record.position.isValidMove(move)) {
     message = 'その手は指せません。別のマスを選んでください。';
     render();
@@ -465,9 +711,124 @@ function mustPromote(toRow, piece) {
 
   return false;
 }
+function completePause() {
+  if (pauseWatchdog !== null) {
+    clearTimeout(pauseWatchdog);
+    pauseWatchdog = null;
+  }
 
+  pauseRequested = false;
+  aiThinking = false;
+  engineStage = 'idle';
+  gamePaused = true;
+
+  clearSelection();
+
+  if (!savePausedGameSession()) {
+    gamePaused = false;
+
+    message = '対局状態を保存できませんでした。中断を取り消します。';
+    setEngineStatus('AIエンジン：対局を継続');
+    setAIStatus('保存失敗');
+
+    render();
+
+    if (engineReady && record.position.color !== playerColor) {
+      requestAiMove();
+    }
+
+    return false;
+  }
+
+  message = '対局を中断しました。エンジンを変更するか、対局を再開できます。';
+  setEngineStatus('AIエンジン：停止確認済み');
+  setAIStatus('対局中断中');
+
+  render();
+  return true;
+}
+
+function pauseGame() {
+  if (!gameStarted || gameOver || gamePaused) return;
+
+  clearSelection();
+
+  if (!aiThinking) {
+    completePause();
+    return;
+  }
+
+  if (!engine) {
+    message = 'エンジンの停止を確認できません。';
+    render();
+    return;
+  }
+
+  pauseRequested = true;
+  message = 'AIエンジンの停止を待っています。';
+
+  try {
+    engine.postMessage('stop');
+  } catch (error) {
+    message = `停止指示に失敗しました：${error.message}`;
+  }
+
+  if (pauseWatchdog !== null) {
+    clearTimeout(pauseWatchdog);
+  }
+
+  pauseWatchdog = window.setTimeout(() => {
+    if (!pauseRequested) return;
+
+    message = 'エンジンの停止応答待ちです。盤面と設定はロックされています。';
+    setEngineStatus('AIエンジン：停止応答待ち');
+    render();
+  }, 15000);
+
+  render();
+}
+function resumeGame() {
+  if (!gameStarted || !gamePaused || gameOver) return;
+
+  if (!engineReady || !engine) {
+    resumeRequestedAfterInit = true;
+    message = 'エンジンを起動しています。';
+    setEngineStatus('AIエンジン：再接続中');
+    setAIStatus('対局再開準備中');
+    render();
+
+    void startEngineSafely({ resumePausedGame: true });
+    return;
+  }
+
+  if (!clearPausedGameSession()) {
+    message = '保存データを削除できないため、再開を中止しました。';
+    render();
+    return;
+  }
+
+  if (pauseWatchdog !== null) {
+    clearTimeout(pauseWatchdog);
+    pauseWatchdog = null;
+  }
+
+  gamePaused = false;
+  pauseRequested = false;
+  resumeRequestedAfterInit = false;
+
+  message = `${currentPlayerName()}の番です。`;
+
+  setEngineStatus('AIエンジン：接続成功');
+  setAIStatus('対局再開');
+
+  if (record.position.color !== playerColor) {
+    requestAiMove();
+  } else {
+    render();
+  }
+}
 function handleSquareClick(row, col) {
-  if (gameOver) return;
+  if (gameOver || gamePaused || pauseRequested) return;
   if (!gameStarted) {
   message = engineReady
     ? '「AIの初手を開始」を押してください。'
@@ -592,6 +953,15 @@ function handleSquareClick(row, col) {
 }
 
 function selectHandPiece(color, type) {
+  if (
+  !gameStarted ||
+  gamePaused ||
+  pauseRequested ||
+  aiThinking ||
+  gameOver
+) {
+  return;
+}
   if (color !== record.position.color) {
     message = '自分の番の持ち駒を選んでください。';
     render();
@@ -638,8 +1008,11 @@ function createHand(color, label) {
   color !== record.position.color ||
   color !== playerColor ||
   !gameStarted ||
-  aiThinking;
+  gamePaused ||
+  pauseRequested ||
+  aiThinking ||
   gameOver;
+
     if (selectedHandPiece === type && color === record.position.color) {
       button.classList.add('selected');
     }
@@ -673,6 +1046,8 @@ function createBoard() {
 
       square.disabled =
         !gameStarted ||
+        gamePaused ||
+        pauseRequested ||
         gameOver ||
         aiThinking ||
         record.position.color !== playerColor;
@@ -742,6 +1117,13 @@ function createApp() {
         <option>右四間飛車</option>
       </select>
     </label>
+    <label>エンジン
+  <select id="engine-select">
+    <option value="suishou">水匠</option>
+    <option value="mini">つようら王11mini</option>
+    <option value="micro">つようら王11micro</option>
+  </select>
+</label>
     <label>思考時間
       <select id="think-time-select">
         <option>0秒</option>
@@ -754,12 +1136,83 @@ function createApp() {
     </label>
   `;
 
+  const engineSelect = controls.querySelector('#engine-select');
+
+engineSelect.value = selectedEngineId;
+engineSelect.disabled =
+  (gameStarted && !gamePaused) || pauseRequested || gameOver;
+
+engineSelect.addEventListener('change', () => {
+  if ((gameStarted && !gamePaused) || pauseRequested || gameOver) {
+    engineSelect.value = selectedEngineId;
+    return;
+  }
+
+  const nextEngineId = engineSelect.value;
+  const previousEngineId = selectedEngineId;
+
+  if (!Object.hasOwn(ENGINE_CONFIGS, nextEngineId)) {
+    engineSelect.value = selectedEngineId;
+    return;
+  }
+
+  try {
+    localStorage.setItem(ENGINE_STORAGE_KEY, nextEngineId);
+  } catch (error) {
+    message = 'エンジン設定を保存できませんでした。';
+    engineSelect.value = selectedEngineId;
+    render();
+    return;
+  }
+
+  selectedEngineId = nextEngineId;
+
+  if (gamePaused && !savePausedGameSession()) {
+  selectedEngineId = previousEngineId;
+  engineSelect.value = previousEngineId;
+
+  try {
+    localStorage.setItem(ENGINE_STORAGE_KEY, previousEngineId);
+  } catch (error) {
+    console.error('エンジン設定の復元に失敗しました:', error);
+  }
+
+  message = '中断中の対局状態を保存できませんでした。';
+  render();
+  return;
+}
+
+  window.location.reload();
+});
+
   const thinkTimeSelect = controls.querySelector('#think-time-select');
 
 thinkTimeSelect.value = selectedThinkTime;
+thinkTimeSelect.disabled =
+  (gameStarted && !gamePaused) ||
+  pauseRequested ||
+  gameOver;
 
 thinkTimeSelect.addEventListener('change', () => {
+  if (
+    (gameStarted && !gamePaused) ||
+    pauseRequested ||
+    gameOver
+  ) {
+    thinkTimeSelect.value = selectedThinkTime;
+    return;
+  }
+
   selectedThinkTime = thinkTimeSelect.value;
+
+  saveAppSettings();
+
+  if (gamePaused) {
+    if (!savePausedGameSession()) {
+      message = '中断中の対局設定を保存できませんでした。';
+      render();
+    }
+  }
 });
 const turnSelect = controls.querySelector('#turn-select');
 
@@ -770,6 +1223,7 @@ turnSelect.addEventListener('change', () => {
   if (gameStarted || aiThinking || gameOver) return;
 
   playerColor = turnSelect.value;
+  saveAppSettings();
 
   message = `${playerColor === 'black' ? '先手' : '後手'}を選択しました。`;
   render();
@@ -779,14 +1233,31 @@ turnSelect.addEventListener('change', () => {
   const startAiButton = makeElement(
   'button',
   'start-ai-button',
-  '対局を開始'
+  gameStarted
+    ? (gamePaused ? '対局再開' : '対局を中断')
+    : '対局を開始'
 );
 
 startAiButton.type = 'button';
-startAiButton.disabled = !engineReady || gameStarted || aiThinking || gameOver;
+startAiButton.disabled =
+  gameOver ||
+  (gameStarted
+    ? pauseRequested
+    : (!engineReady || aiThinking));
 
 startAiButton.addEventListener('click', () => {
-  if (!engineReady || gameStarted || aiThinking || gameOver) return;
+  if (gameOver) return;
+
+  if (gameStarted) {
+    if (gamePaused) {
+      resumeGame();
+    } else if (!pauseRequested) {
+      pauseGame();
+    }
+    return;
+  }
+
+  if (!engineReady || aiThinking) return;
 
   gameStarted = true;
 
@@ -855,6 +1326,8 @@ waitButton.type = 'button';
 
 waitButton.disabled =
   !gameStarted ||
+  gamePaused ||
+  pauseRequested ||
   aiThinking ||
   pendingPromotion ||
   moveHistory.length < (playerColor === 'black' ? 2 : 3) ||
@@ -922,7 +1395,11 @@ container.appendChild(waitButton);
 
   const resignButton = makeElement('button', 'resign-button', '投了');
 resignButton.type = 'button';
-resignButton.disabled = !gameStarted || gameOver;
+resignButton.disabled =
+  !gameStarted ||
+  gamePaused ||
+  pauseRequested ||
+  gameOver;
 
 resignButton.addEventListener('click', resignGame);
 
@@ -965,7 +1442,7 @@ if (diagnosticLog) {
     diagnosticState.entries.join('\n');
 }
 }
-
+restorePausedGameSession();
 render();
 
 function applyEngineMove(usiMove) {
@@ -989,7 +1466,16 @@ function applyEngineMove(usiMove) {
 }
 
 function requestAiMove() {
-  if (!engineReady || !engine || aiThinking || gameOver) return;
+  if (
+    !engineReady ||
+    !engine ||
+    aiThinking ||
+    gamePaused ||
+    pauseRequested ||
+    gameOver
+  ) {
+    return;
+  }
 
   aiThinking = true;
   engineStage = 'thinking';
@@ -1145,12 +1631,16 @@ async function diagnoseServiceWorker() {
     const response = await fetch(window.location.href, {
       cache: 'no-store'
     });
-    const engineResponse = await fetch(
-  `${import.meta.env.BASE_URL}engine/sse42/yaneuraou.js`,
-  {
-    cache: 'no-store'
-  }
-);
+    const engineConfig = ENGINE_CONFIGS[selectedEngineId];
+
+const engineScriptUrl = new URL(
+  `${import.meta.env.BASE_URL}${engineConfig.scriptPath}`,
+  window.location.origin
+).href;
+
+const engineResponse = await fetch(engineScriptUrl, {
+  cache: 'no-store'
+});
 // エンジンJSの内容と構文を診断する
 try {
   const engineSource = await engineResponse.clone().text();
@@ -1216,8 +1706,10 @@ async function connectEngine() {
     addDiagnostic('エンジン接続処理開始');
     setEngineStatus('AIエンジン：JavaScript読み込み中...');
 
-  const scriptUrl = new URL(
-  `${import.meta.env.BASE_URL}engine/sse42/yaneuraou.js`,
+  const engineConfig = ENGINE_CONFIGS[selectedEngineId];
+
+const scriptUrl = new URL(
+  `${import.meta.env.BASE_URL}${engineConfig.scriptPath}`,
   window.location.origin
 ).href;
 // WorkerとWASMの応答を個別に診断する
@@ -1262,13 +1754,14 @@ await inspectEngineAsset('yaneuraou.worker.js', true);
 await inspectEngineAsset('yaneuraou.wasm');
 // Worker内部からエンジンJSを読み込めるか診断する
 await new Promise((resolve) => {
+  const probeFactoryName = JSON.stringify(engineConfig.factoryName);
   const probeSource = `
     self.onmessage = (event) => {
       try {
         importScripts(event.data.url);
         self.postMessage({
           ok: true,
-          factoryType: typeof self.YaneuraOu_sse42
+          factorytype: type seif[${probeFactoryName}]
         });
       } catch (error) {
         self.postMessage({
@@ -1358,7 +1851,7 @@ try {
   );
 }
 
-const factoryType = typeof window.YaneuraOu_sse42;
+const factoryType = typeof window[engineConfig.factoryName];
 
 addDiagnostic(
   `eval後の初期化関数の型=${factoryType}`
@@ -1376,7 +1869,7 @@ if (factoryType !== 'function') {
     let timeoutId;
 
     try {
-      const initPromise = window.YaneuraOu_sse42({
+      const initPromise = window[engineConfig.factoryName]({
   locateFile: (file) => new URL(file, scriptUrl).href,
   mainScriptUrlOrBlob: new Blob([source], { type: 'text/javascript' })
 });
@@ -1403,6 +1896,54 @@ if (factoryType !== 'function') {
 
     addDiagnostic('WASM初期化成功');
 
+    if (engineConfig.evalDataPath) {
+  if (!engine.FS?.writeFile) {
+    throw new Error('WASMのファイルシステムを利用できません。');
+  }
+
+  try {
+    engine.FS.stat('/evaldata');
+  } catch {
+    engine.FS.mkdir('/evaldata');
+  }
+
+  const evalFiles = [
+    'nn.bin',
+    'progress.bin',
+    'eval_options.txt',
+    'tag.json',
+  ];
+
+  for (const file of evalFiles) {
+    const url = new URL(
+      `${import.meta.env.BASE_URL}${engineConfig.evalDataPath}/${file}`,
+      window.location.origin
+    ).href;
+
+    const response = await fetch(url, {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `評価ファイルの取得に失敗しました: ${file} (HTTP ${response.status})`
+      );
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+
+    if (bytes.length === 0) {
+      throw new Error(`評価ファイルが空です: ${file}`);
+    }
+
+    engine.FS.writeFile(`/evaldata/${file}`, bytes);
+
+    addDiagnostic(
+      `評価ファイル読み込み成功: ${file} (${bytes.length} bytes)`
+    );
+  }
+}
+
     engineStage = 'usi';
     addDiagnostic('USI応答の待機を開始');
 
@@ -1424,7 +1965,18 @@ if (factoryType !== 'function') {
         );
 
         engine.postMessage('setoption name USI_Hash value 16');
+
+        if (engineConfig.evalDataPath) {
+          engine.postMessage('setoption name Threads value 4');
+          engine.postMessage('setoption name EvalDir value evaldata');
+          engine.postMessage('setoption name FV_SCALE value 24');
+          engine.postMessage('setoption name MinimumThinkingTime value 1');
+          engine.postMessage('setoption name RoundUpToFullSecond value false');
+        }
+
         engine.postMessage('isready');
+
+      
 
         addDiagnostic('USIコマンド送信: isready');
         return;
@@ -1441,6 +1993,10 @@ if (factoryType !== 'function') {
 
         setEngineStatus('AIエンジン：接続成功');
         setAIStatus('AIの準備完了');
+        if (resumeRequestedAfterInit) {
+          resumeGame();
+          return;
+        }
 
         render();
         return;
@@ -1455,7 +2011,11 @@ if (factoryType !== 'function') {
 
         aiThinking = false;
         engineStage = 'idle';
-
+        if (pauseRequested) {
+          addDiagnostic('中断要求後のbestmoveを受信。指し手を反映せず停止します。');
+          completePause();
+          return;
+        }
         if (
           !usiMove ||
           ['resign', 'win', '(none)'].includes(usiMove)
@@ -1497,7 +2057,14 @@ if (factoryType !== 'function') {
     render();
   }
 }
-async function startEngineSafely() {
+async function startEngineSafely({ resumePausedGame = false } = {}) {
+  if (gamePaused && !resumePausedGame) {
+    setEngineStatus('AIエンジン：対局中断中');
+    setAIStatus('対局中断中');
+    render();
+    return;
+  }
+
   // 先にService Workerと応答ヘッダーを診断する
   await diagnoseServiceWorker();
 
