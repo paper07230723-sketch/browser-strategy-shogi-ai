@@ -1896,7 +1896,6 @@ if (factoryType !== 'function') {
     try {
       const initPromise = window[engineConfig.factoryName]({
   locateFile: (file) => new URL(file, scriptUrl).href,
-  mainScriptUrlOrBlob: scriptUrl
 });
 
       const timeoutPromise = new Promise((_, reject) => {
