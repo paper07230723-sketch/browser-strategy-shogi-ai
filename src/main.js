@@ -1841,40 +1841,50 @@ await new Promise((resolve) => {
     });
   }
 });
-addDiagnostic(`エンジンJS取得開始: ${scriptUrl}`);
+addDiagnostic(`エンジンJS読み込み開始: ${scriptUrl}`);
 
-const response = await fetch(scriptUrl, {
-  cache: 'no-store'
-});
+if (typeof window[engineConfig.factoryName] !== 'function') {
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = scriptUrl;
+    script.async = true;
 
-if (!response.ok) {
-  throw new Error(`エンジンJS取得失敗: HTTP ${response.status}`);
-}
+    const timeoutId = window.setTimeout(() => {
+      script.onload = null;
+      script.onerror = null;
+      script.remove();
+      reject(
+        new Error('エンジンJSの読み込みが30秒でタイムアウトしました')
+      );
+    }, 30000);
 
-const source = await response.text();
+    script.onload = () => {
+      window.clearTimeout(timeoutId);
+      script.remove();
+      resolve();
+    };
 
-addDiagnostic(
-  `エンジンJS取得成功: 文字数=${source.length}`
-);
+    script.onerror = () => {
+      window.clearTimeout(timeoutId);
+      script.remove();
+      reject(
+        new Error(`エンジンJSの読み込みに失敗しました: ${scriptUrl}`)
+      );
+    };
 
-try {
-  // グローバルスコープで初期化関数を登録する
-  (0, eval)(source);
-} catch (error) {
-  throw new Error(
-    `エンジンJS実行失敗: ${error?.message || String(error)}`
-  );
+    document.head.appendChild(script);
+  });
 }
 
 const factoryType = typeof window[engineConfig.factoryName];
 
 addDiagnostic(
-  `eval後の初期化関数の型=${factoryType}`
+  `script要素読み込み後の初期化関数の型=${factoryType}`
 );
 
 if (factoryType !== 'function') {
   throw new Error(
-    'eval後もエンジン初期化関数が見つかりません'
+    'script要素読み込み後もエンジン初期化関数が見つかりません'
   );
 }
 
@@ -1886,7 +1896,7 @@ if (factoryType !== 'function') {
     try {
       const initPromise = window[engineConfig.factoryName]({
   locateFile: (file) => new URL(file, scriptUrl).href,
-  mainScriptUrlOrBlob: new Blob([source], { type: 'text/javascript' })
+  mainscripturlorblob:%20scriptUrl
 });
 
       const timeoutPromise = new Promise((_, reject) => {
