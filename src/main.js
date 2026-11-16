@@ -1525,53 +1525,7 @@ function requestAiMove() {
     render();
   }
 }
-async function inspectEngineResponse(url, label) {
-  try {
-    const response = await fetch(url, {
-      cache: 'no-store'
-    });
 
-    let sample = '';
-
-    if (response.body) {
-      const reader = response.body.getReader();
-      const result = await reader.read();
-
-      if (result.value) {
-        sample = new TextDecoder().decode(
-          result.value.slice(0, 1024)
-        );
-      }
-
-      await reader.cancel().catch(() => {});
-    }
-
-    const contentType =
-      response.headers.get('content-type') || '不明';
-
-    addDiagnostic(
-      `${label}: GET=${response.status} ${response.statusText}; ` +
-      `Content-Type=${contentType}; ` +
-      `redirected=${response.redirected}; ` +
-      `取得先=${response.url}`
-    );
-
-    addDiagnostic(
-      `${label}: 先頭部分=${JSON.stringify(
-        sample.replace(/\s+/g, ' ').slice(0, 180)
-      )}; ` +
-      `YaneuraOu_sse42の文字列=${
-        sample.includes('YaneuraOu_sse42')
-      }`
-    );
-  } catch (error) {
-    addDiagnostic(
-      `${label}: GET調査に失敗=${
-        error?.message || String(error)
-      }`
-    );
-  }
-}
 window.addEventListener('error', (event) => {
   const target = event.target;
   const targetSrc = target?.src || '';
@@ -1608,115 +1562,7 @@ window.addEventListener('unhandledrejection', (event) => {
     }`
   );
 });
-async function diagnoseServiceWorker() {
-  try {
-    const controller = navigator.serviceWorker?.controller;
 
-    addDiagnostic(
-      `SW制御状態: ${
-        controller
-          ? `${controller.state || '状態不明'}; ${controller.scriptURL}`
-          : 'controllerなし'
-      }`
-    );
-
-    if (navigator.serviceWorker) {
-      const registrations =
-        await navigator.serviceWorker.getRegistrations();
-
-      const summary = registrations.map((registration) => {
-        const active = registration.active;
-        const waiting = registration.waiting;
-        const installing = registration.installing;
-
-        return (
-          `scope=${registration.scope}; ` +
-          `active=${active?.state || 'なし'}; ` +
-          `waiting=${waiting?.state || 'なし'}; ` +
-          `installing=${installing?.state || 'なし'}`
-        );
-      });
-
-      addDiagnostic(
-        `SW登録一覧: ${
-          summary.length ? summary.join(' | ') : '登録なし'
-        }`
-      );
-    }
-
-    const response = await fetch(window.location.href, {
-      cache: 'no-store'
-    });
-    const engineConfig = ENGINE_CONFIGS[selectedEngineId];
-
-const engineScriptUrl = new URL(
-  `${import.meta.env.BASE_URL}${engineConfig.scriptPath}`,
-  window.location.origin
-).href;
-
-const engineResponse = await fetch(engineScriptUrl, {
-  cache: 'no-store'
-});
-// エンジンJSの内容と構文を診断する
-try {
-  const engineSource = await engineResponse.clone().text();
-
-  addDiagnostic(
-    `エンジンJS内容検査: ` +
-    `文字数=${engineSource.length}; ` +
-    `先頭=${JSON.stringify(engineSource.slice(0, 100))}; ` +
-    `末尾=${JSON.stringify(engineSource.slice(-200))}`
-  );
-
-  try {
-    // 実行せずに、JavaScriptとして構文を解析できるか確認する
-    new Function(engineSource);
-    addDiagnostic('エンジンJS構文検査: 成功');
-  } catch (error) {
-    addDiagnostic(
-      `エンジンJS構文検査: ` +
-      `${error.name}: ${error.message}`
-    );
-  }
-} catch (error) {
-  addDiagnostic(
-    `エンジンJS内容検査失敗: ` +
-    `${error.name}: ${error.message}`
-  );
-}
-addDiagnostic(
-  `エンジン応答ヘッダー: ` +
-  `status=${engineResponse.status}; ` +
-  `Content-Type=${
-    engineResponse.headers.get('Content-Type') || 'なし'
-  }; ` +
-  `COOP=${
-    engineResponse.headers.get('Cross-Origin-Opener-Policy') || 'なし'
-  }; ` +
-  `COEP=${
-    engineResponse.headers.get('Cross-Origin-Embedder-Policy') || 'なし'
-  }; ` +
-  `CORP=${
-    engineResponse.headers.get('Cross-Origin-Resource-Policy') || 'なし'
-  }; ` +
-  `Content-Encoding=${
-    engineResponse.headers.get('Content-Encoding') || 'なし'
-  }`
-);
-    addDiagnostic(
-      `ページ応答: status=${response.status}; ` +
-      `COOP=${response.headers.get('Cross-Origin-Opener-Policy') || 'なし'}; ` +
-      `COEP=${response.headers.get('Cross-Origin-Embedder-Policy') || 'なし'}; ` +
-      `CORP=${response.headers.get('Cross-Origin-Resource-Policy') || 'なし'}`
-    );
-  } catch (error) {
-    addDiagnostic(
-      `SW・ヘッダー診断エラー: ${
-        error?.message || String(error)
-      }`
-    );
-  }
-}
 async function connectEngine() {
   try {
     addDiagnostic('エンジン接続処理開始');
@@ -1728,120 +1574,7 @@ const scriptUrl = new URL(
   `${import.meta.env.BASE_URL}${engineConfig.scriptPath}`,
   window.location.origin
 ).href;
-// WorkerとWASMの応答を個別に診断する
-async function inspectEngineAsset(file, inspectText = false) {
-  const url = new URL(file, scriptUrl).href;
 
-  try {
-    const response = await fetch(url, {
-      cache: 'no-store'
-    });
-
-    let size = response.headers.get('Content-Length') || '不明';
-    let preview = '';
-
-    if (inspectText) {
-      const source = await response.text();
-      size = new TextEncoder().encode(source).length;
-
-      preview =
-        `; 先頭=${JSON.stringify(source.slice(0, 100))}`;
-    }
-
-    addDiagnostic(
-      `関連ファイル診断 ${file}: ` +
-      `status=${response.status}; ` +
-      `Content-Type=${response.headers.get('Content-Type') || 'なし'}; ` +
-      `COEP=${response.headers.get('Cross-Origin-Embedder-Policy') || 'なし'}; ` +
-      `CORP=${response.headers.get('Cross-Origin-Resource-Policy') || 'なし'}; ` +
-      `サイズ=${size}; ` +
-      `redirected=${response.redirected}; ` +
-      `URL=${response.url}${preview}`
-    );
-  } catch (error) {
-    addDiagnostic(
-      `関連ファイル診断失敗 ${file}: ` +
-      `${error?.name || 'Error'}: ${error?.message || String(error)}`
-    );
-  }
-}
-
-await inspectEngineAsset('yaneuraou.worker.js', true);
-await inspectEngineAsset('yaneuraou.wasm');
-// Worker内部からエンジンJSを読み込めるか診断する
-await new Promise((resolve) => {
-  const probeFactoryName = JSON.stringify(engineConfig.factoryName);
-  const probeSource = `
-    self.onmessage = (event) => {
-      try {
-        importScripts(event.data.url);
-        self.postMessage({
-          ok: true,
-          factorytype: typeof self[${probeFactoryName}]
-        });
-      } catch (error) {
-        self.postMessage({
-          ok: false,
-          name: error?.name,
-          message: error?.message,
-          stack: error?.stack
-        });
-      }
-    };
-  `;
-
-  let worker;
-  let blobUrl;
-  let timeoutId;
-  let finished = false;
-
-  const finish = (result) => {
-    if (finished) return;
-    finished = true;
-
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
-    if (worker) worker.terminate();
-    if (blobUrl) URL.revokeObjectURL(blobUrl);
-
-    addDiagnostic(
-      `Worker内importScripts診断: ${JSON.stringify(result)}`
-    );
-    resolve();
-  };
-
-  try {
-    blobUrl = URL.createObjectURL(
-      new Blob([probeSource], { type: 'text/javascript' })
-    );
-
-    worker = new Worker(blobUrl);
-
-    worker.onmessage = (event) => finish(event.data);
-
-    worker.onerror = (event) => {
-      finish({
-        ok: false,
-        error: 'WorkerError',
-        message: event.message,
-        filename: event.filename,
-        line: event.lineno
-      });
-    };
-
-    timeoutId = setTimeout(
-      () => finish({ ok: false, error: 'timeout' }),
-      5000
-    );
-
-    worker.postMessage({ url: scriptUrl });
-  } catch (error) {
-    finish({
-      ok: false,
-      name: error?.name,
-      message: error?.message
-    });
-  }
-});
 addDiagnostic(`エンジンJS読み込み開始: ${scriptUrl}`);
 
 if (typeof window[engineConfig.factoryName] !== 'function') {
@@ -2094,9 +1827,7 @@ async function startEngineSafely({ resumePausedGame = false } = {}) {
     render();
     return;
   }
-
-  // 先にService Workerと応答ヘッダーを診断する
-  await diagnoseServiceWorker();
+  
 
   const retryKey = 'browser-strategy-shogi-ai-coi-retry-v2';
 
