@@ -1152,10 +1152,10 @@ function createApp() {
 
 engineSelect.value = selectedEngineId;
 engineSelect.disabled =
-  (gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || gameOver;
+  (gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || ignoreNextBestmove || gameOver;
 
 engineSelect.addEventListener('change', () => {
-  if ((gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || gameOver) {
+  if ((gameStarted && !gamePaused) || resumeRequestedAfterInit || pauseRequested || ignoreNextBestmove || gameOver) {
     engineSelect.value = selectedEngineId;
     return;
   }
@@ -1255,6 +1255,7 @@ turnSelect.addEventListener('change', () => {
 startAiButton.type = 'button';
 startAiButton.disabled =
   gameOver ||
+  ignoreNextBestmove ||
   resumeRequestedAfterInit ||
   (gameStarted
     ? pauseRequested
@@ -1272,7 +1273,7 @@ startAiButton.addEventListener('click', () => {
     return;
   }
 
-  if (!engineReady || aiThinking) return;
+  if (!engineReady || aiThinking || ignoreNextBestmove) return;
 
   gameStarted = true;
 
@@ -1975,10 +1976,14 @@ if (factoryType !== 'function') {
       const received = String(line).trim();
       console.log('[USI]', received);
   if (received.startsWith('bestmove') && ignoreNextBestmove) {
-    ignoreNextBestmove = false;
-    addDiagnostic('投了後に届いたAIの指し手を無視しました。');
-    return;
-  }
+  ignoreNextBestmove = false;
+
+  addDiagnostic('投了後の停止応答を確認。指し手を無視しました。');
+
+  message = 'AIエンジンの停止を確認しました。新しい対局を開始できます。';
+  render();
+  return;
+}
       if (engineStage === 'usi' && received.includes('usiok')) {
         engineStage = 'ready';
 
