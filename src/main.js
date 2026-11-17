@@ -588,7 +588,7 @@ function setAIStatus(text) {
   if (element) {
     element.innerHTML = `
       <p>手数：${Math.max(0, record.length - 1)}</p>
-      <p>評価値（先手視点・歩=1.00）：<span id="evaluation-value">${evaluationText}</span></p>
+      <p>評価値（先手視点・歩=100点）：<span id="evaluation-value">${evaluationText}</span></p>
       <p>AI状態：${aiStatusText}</p>
     `;
   }
@@ -1371,7 +1371,7 @@ container.appendChild(waitButton);
   information.id = 'move-information';
   information.innerHTML = `
     <p>手数：${Math.max(0, record.length - 1)}</p>
-    <p>評価値（先手視点・歩=1.00）：<span id="evaluation-value">${evaluationText}</span></p>
+    <p>評価値（先手視点・歩=100点）：<span id="evaluation-value">${evaluationText}</span></p>
     <p>AI状態：${aiStatusText}</p>
   `;
   container.appendChild(information);
@@ -1750,9 +1750,8 @@ if (factoryType !== 'function') {
               Number(scoreMatch[2]) * evaluationPerspectiveSign;
 
             if (scoreMatch[1] === 'cp') {
-              const pawns = score / 100;
               const formatted =
-                (pawns > 0 ? '+' : '') + pawns.toFixed(2);
+                (score > 0 ? '+' : '') + String(score);
 
               setEvaluationText(formatted);
             } else {
