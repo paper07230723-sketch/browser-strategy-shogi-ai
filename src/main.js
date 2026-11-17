@@ -129,6 +129,9 @@ let aiThinking = false;
 let engineStage = 'loading';
 let engineStatusText = 'AIエンジン：接続準備中';
 let aiStatusText = 'AIの初期化中';
+let evaluationText = '—';
+let evaluationPerspectiveSign = 1;
+let evaluationDepth = -1;
 let moveHistory = [];
 let ignoreNextBestmove = false;
 let gameOver = false;
@@ -385,6 +388,7 @@ if (pauseWatchdog !== null) {
 function returnToGameSetup() {
   record.clear();
   moveHistory = [];
+  setEvaluationText('—');
 
   clearSelection();
 
@@ -430,6 +434,7 @@ function resignGame() {
   gamePaused = false;
   pauseRequested = false;
   resumeRequestedAfterInit = false;
+  setEvaluationText('—');
   clearPausedGameSession();
 
 if (pauseWatchdog !== null) {
@@ -491,6 +496,7 @@ function takeBack() {
   }
 
   moveHistory = movesToKeep;
+  setEvaluationText('—');
   clearSelection();
 
   message = '直前のプレイヤーとAIの着手を取り消しました。';
@@ -582,9 +588,18 @@ function setAIStatus(text) {
   if (element) {
     element.innerHTML = `
       <p>手数：${Math.max(0, record.length - 1)}</p>
-      <p>評価値：—</p>
+      <p>評価値（先手視点・歩=1.00）：<span id="evaluation-value">${evaluationText}</span></p>
       <p>AI状態：${aiStatusText}</p>
     `;
+  }
+}
+
+function setEvaluationText(text) {
+  evaluationText = text;
+  const element = document.querySelector('#evaluation-value');
+
+  if (element) {
+    element.textContent = text;
   }
 }
 
@@ -1275,6 +1290,7 @@ startAiButton.addEventListener('click', () => {
 
   if (!engineReady || aiThinking || ignoreNextBestmove) return;
 
+  setEvaluationText('—');
   gameStarted = true;
 
   if (record.position.color === playerColor) {
@@ -1355,7 +1371,7 @@ container.appendChild(waitButton);
   information.id = 'move-information';
   information.innerHTML = `
     <p>手数：${Math.max(0, record.length - 1)}</p>
-    <p>評価値：—</p>
+    <p>評価値（先手視点・歩=1.00）：<span id="evaluation-value">${evaluationText}</span></p>
     <p>AI状態：${aiStatusText}</p>
   `;
   container.appendChild(information);
@@ -1492,6 +1508,11 @@ function requestAiMove() {
   ) {
     return;
   }
+
+  evaluationPerspectiveSign =
+    record.position.color === 'black' ? 1 : -1;
+  evaluationDepth = -1;
+  setEvaluationText('—');
 
   aiThinking = true;
   engineStage = 'thinking';
@@ -1708,6 +1729,51 @@ if (factoryType !== 'function') {
     engine.addMessageListener((line) => {
       const received = String(line).trim();
       console.log('[USI]', received);
+
+      if (engineStage === 'thinking' && received.startsWith('info ')) {
+        const depthMatch = received.match(/\bdepth\s+(\d+)\b/);
+        const multiPvMatch = received.match(/\bmultipv\s+(\d+)\b/);
+        const scoreMatch = received.match(/\bscore\s+(cp|mate)\s+(-?\d+)\b/);
+        const hasBound = /\b(?:lowerbound|upperbound)\b/.test(received);
+
+        if (
+          depthMatch &&
+          (!multiPvMatch || Number(multiPvMatch[1]) === 1) &&
+          scoreMatch &&
+          !hasBound
+        ) {
+          const depth = Number(depthMatch[1]);
+
+          if (Number.isSafeInteger(depth) && depth >= evaluationDepth) {
+            evaluationDepth = depth;
+            const score =
+              Number(scoreMatch[2]) * evaluationPerspectiveSign;
+
+            if (scoreMatch[1] === 'cp') {
+              const pawns = score / 100;
+              const formatted =
+                (pawns > 0 ? '+' : '') + pawns.toFixed(2);
+
+              setEvaluationText(formatted);
+            } else {
+              const rawMateText = scoreMatch[2];
+              const rawMate = Number(rawMateText);
+              const engineWins = !rawMateText.startsWith('-');
+              const senteWins = engineWins
+                ? evaluationPerspectiveSign === 1
+                : evaluationPerspectiveSign === -1;
+              const mateDescription = rawMateText === '-0'
+                ? 'エンジン側は既に詰み'
+                : `エンジン視点のUSI mate値 ${rawMate > 0 ? '+' : ''}${rawMate}`;
+
+              setEvaluationText(
+                (senteWins ? '先手勝ち' : '後手勝ち') +
+                `（${mateDescription}）`
+              );
+            }
+          }
+        }
+      }
   if (received.startsWith('bestmove') && ignoreNextBestmove) {
   ignoreNextBestmove = false;
 
