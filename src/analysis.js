@@ -1,5 +1,6 @@
 
 import "./analysis.css";
+import { AnalysisEngine } from "./analysis-engine.js";
 import {
   Color,
   PieceType,
@@ -27,9 +28,13 @@ const HAND_PIECES = [
   PieceType.LANCE,
   PieceType.PAWN,
 ];
+
 const state = {
   record: null,
   moveNodes: [],
+  analysisRunning: false,
+  analysisCancelled: false,
+  analysisResults: [],
 };
 
 const element = (tag, className, text) => {
@@ -284,7 +289,17 @@ const firstButton = document.querySelector("#goto-first");
 const backButton = document.querySelector("#go-back");
 const forwardButton = document.querySelector("#go-forward");
 const lastButton = document.querySelector("#goto-last");
+const thinkTimeSelect = document.querySelector("#analysis-think-time");
+const startAnalysisButton = document.querySelector("#start-analysis");
+const stopAnalysisButton = document.querySelector("#stop-analysis");
+const engineStatus = document.querySelector("#analysis-engine-status");
+const analysisProgress = document.querySelector("#analysis-progress");
 
+const analysisEngine = new AnalysisEngine({
+  onStatus: ({ message }) => {
+    engineStatus.textContent = message;
+  },
+});
 function showNotice(message, type = "") {
   notice.className = "analysis-notice";
 
@@ -578,6 +593,9 @@ function loadKifu() {
 
       state.record = imported;
       state.moveNodes = nodes;
+      startAnalysisButton.disabled = false;
+      state.analysisResults = [];
+      renderAnalysisResults();
 
       renderLoadedRecord();
 
@@ -670,3 +688,178 @@ clearButton.addEventListener("click", () => {
 });
 
 updateNavigation();
+function formatEvaluation(info) {
+  if (!info?.score) return "評価値：取得できませんでした";
+
+  if (info.score.type === "mate") {
+    return `詰みまで ${info.score.value} 手`;
+  }
+
+  return `評価値：${info.score.value} cp`;
+}
+
+function collectAnalysisPositions() {
+  const record = state.record;
+  const originalPly = record.current.ply;
+  const positions = [];
+
+  try {
+    for (let ply = 0; ply <= record.length; ply++) {
+      record.goto(ply);
+
+      positions.push({
+        ply,
+        sfen: record.position.sfen,
+        move: ply === 0
+          ? "開始局面"
+          : record.current.displayText,
+      });
+    }
+  } finally {
+    record.goto(originalPly);
+    renderPosition();
+  }
+
+  return positions;
+}
+
+function renderAnalysisResults() {
+  const fragment = document.createDocumentFragment();
+
+  for (const result of state.analysisResults) {
+    const item = element(
+      "div",
+      "analysis-progress"
+    );
+
+    const heading = element(
+      "strong",
+      "",
+      `${result.ply}手目：${result.move}`
+    );
+
+    const evaluation = element(
+      "div",
+      "",
+      formatEvaluation(result.info)
+    );
+
+    const bestMove = element(
+      "div",
+      "",
+      `推奨手：${result.bestmove || "なし"}`
+    );
+
+    const depth = element(
+      "div",
+      "",
+      `探索深さ：${result.info?.depth ?? "不明"}`
+    );
+
+    item.append(heading, evaluation, bestMove, depth);
+    fragment.appendChild(item);
+  }
+
+  if (state.analysisResults.length === 0) {
+    fragment.appendChild(
+      element("div", "analysis-placeholder", "解析結果はまだありません。")
+    );
+  }
+
+  analysisProgress.replaceChildren(fragment);
+}
+
+async function startAnalysis() {
+  if (!state.record || state.analysisRunning) return;
+
+  state.analysisRunning = true;
+  state.analysisCancelled = false;
+  state.analysisResults = [];
+
+  startAnalysisButton.disabled = true;
+  stopAnalysisButton.disabled = false;
+  loadButton.disabled = true;
+  clearButton.disabled = true;
+  thinkTimeSelect.disabled = true;
+
+  analysisProgress.textContent = "解析準備中です。";
+
+  try {
+    const positions = collectAnalysisPositions();
+    const thinkSeconds = Number(thinkTimeSelect.value);
+
+    engineStatus.textContent = "AIエンジンを初期化しています。";
+    await analysisEngine.initialize();
+
+    for (let index = 0; index < positions.length; index++) {
+      if (state.analysisCancelled) break;
+
+      const position = positions[index];
+
+      engineStatus.textContent =
+        `${position.ply}手目を解析しています。`;
+
+      analysisProgress.textContent =
+        `進捗：${index + 1} / ${positions.length} 局面`;
+
+      const result = await analysisEngine.analyze(
+        `position sfen ${position.sfen}`,
+        thinkSeconds
+      );
+
+      if (result.cancelled || state.analysisCancelled) break;
+
+      state.analysisResults.push({
+        ply: position.ply,
+        move: position.move,
+        bestmove: result.bestmove,
+        info: result.info,
+      });
+
+      renderAnalysisResults();
+
+      analysisProgress.insertBefore(
+        element(
+          "div",
+          "",
+          `進捗：${index + 1} / ${positions.length} 局面`
+        ),
+        analysisProgress.firstChild
+      );
+    }
+
+    if (state.analysisCancelled) {
+      engineStatus.textContent = "解析を停止しました。";
+    } else {
+      engineStatus.textContent =
+        `解析完了：${state.analysisResults.length}局面`;
+    }
+  } catch (error) {
+    console.error("棋譜解析エラー:", error);
+    engineStatus.textContent =
+      `解析エラー：${error?.message || String(error)}`;
+  } finally {
+    state.analysisRunning = false;
+    startAnalysisButton.disabled = !state.record;
+    stopAnalysisButton.disabled = true;
+    loadButton.disabled = false;
+    clearButton.disabled = false;
+    thinkTimeSelect.disabled = false;
+  }
+}
+
+startAnalysisButton.addEventListener("click", startAnalysis);
+
+stopAnalysisButton.addEventListener("click", async () => {
+  if (!state.analysisRunning) return;
+
+  state.analysisCancelled = true;
+  stopAnalysisButton.disabled = true;
+  engineStatus.textContent = "解析を停止しています。";
+
+  try {
+    await analysisEngine.stop();
+  } catch (error) {
+    console.error("解析停止エラー:", error);
+  }
+});
