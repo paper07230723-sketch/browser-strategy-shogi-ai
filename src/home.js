@@ -54,11 +54,38 @@ home.innerHTML = `
       </span>
     </a>
 
-    <section
-      class="feature-card feature-card--disabled"
-      aria-labelledby="analysis-title"
-      aria-describedby="analysis-description"
-    >
+    <a
+  class="feature-card feature-card--link"
+  href="./analysis.html"
+  aria-labelledby="analysis-title"
+  aria-describedby="analysis-description"
+>
+  <span class="feature-card__topline">
+    ANALYSIS MODE
+  </span>
+
+  <span class="feature-card__icon" aria-hidden="true">
+    📊
+  </span>
+
+  <span class="feature-card__title" id="analysis-title">
+    棋譜解析
+  </span>
+
+  <span
+    class="feature-card__description"
+    id="analysis-description"
+  >
+    KIF形式の棋譜を読み込み、
+    盤面や指し手を確認できます。
+    AIによる評価機能も追加予定です。
+  </span>
+
+  <span class="feature-card__action">
+    棋譜解析を始める
+    <span aria-hidden="true">→</span>
+  </span>
+</a>
       <span class="feature-card__status">
         準備中
       </span>
