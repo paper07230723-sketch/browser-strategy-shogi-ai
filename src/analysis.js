@@ -315,9 +315,6 @@ function renderBoard() {
 
       square.setAttribute("role", "gridcell");
 
-      const file = 9 - col;
-      const rank = row + 1;
-
       square.setAttribute(
         "aria-label",
         `${file}筋${rank}段 ${
