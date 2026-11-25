@@ -207,6 +207,61 @@ app.innerHTML = `
     </div>
 
     <footer class="analysis-footer">
+        <section class="analysis-card analysis-engine-card">
+      <h2>AI棋譜解析</h2>
+
+      <p class="analysis-engine-description">
+        読み込んだ棋譜の各局面を、選択中のAIエンジンで順番に解析します。
+      </p>
+
+      <div class="analysis-engine-settings">
+        <label for="analysis-think-time">
+          1局面あたりの解析時間
+        </label>
+
+        <select id="analysis-think-time">
+          <option value="1" selected>1秒</option>
+          <option value="3">3秒</option>
+          <option value="5">5秒</option>
+        </select>
+      </div>
+
+      <div class="analysis-engine-actions">
+        <button
+          type="button"
+          id="start-analysis"
+          class="analysis-button analysis-button--primary"
+          disabled
+        >
+          解析開始
+        </button>
+
+        <button
+          type="button"
+          id="stop-analysis"
+          class="analysis-button"
+          disabled
+        >
+          解析停止
+        </button>
+      </div>
+
+      <div
+        id="analysis-engine-status"
+        class="analysis-notice"
+        role="status"
+        aria-live="polite"
+      >
+        棋譜を読み込むと解析を開始できます。
+      </div>
+
+      <div
+        id="analysis-progress"
+        class="analysis-progress"
+      >
+        解析結果はまだありません。
+      </div>
+    </section>
       戦型指定型将棋AI
     </footer>
 
