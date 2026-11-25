@@ -18,6 +18,29 @@ if (!app) {
 
 const MAX_KIF_CHARACTERS = 250_000;
 const MAX_MOVE_COUNT = 3_000;
+const ENGINE_STORAGE_KEY = "browser-strategy-shogi-ai-engine";
+const ANALYSIS_RELOAD_STATE_KEY =
+  "browser-strategy-shogi-ai-reload-state-v1";
+
+const ENGINE_OPTIONS = Object.freeze({
+  suishou: "水匠",
+  mini: "つようら王11mini",
+  micro: "つようら王11micro",
+});
+
+const VALID_ANALYSIS_TIMES = ["1", "3", "5"];
+
+function getSelectedEngineId() {
+  try {
+    const saved = localStorage.getItem(ENGINE_STORAGE_KEY);
+
+    return Object.hasOwn(ENGINE_OPTIONS, saved)
+      ? saved
+      : "suishou";
+  } catch {
+    return "suishou";
+  }
+}
 
 const HAND_PIECES = [
   PieceType.ROOK,
@@ -32,6 +55,7 @@ const HAND_PIECES = [
 const state = {
   record: null,
   moveNodes: [],
+  loadedKifuText: "",
   analysisRunning: false,
   analysisCancelled: false,
   analysisResults: [],
@@ -219,17 +243,29 @@ app.innerHTML = `
         読み込んだ棋譜の各局面を、選択中のAIエンジンで順番に解析します。
       </p>
 
-      <div class="analysis-engine-settings">
-        <label for="analysis-think-time">
-          1局面あたりの解析時間
-        </label>
+     <div class="analysis-engine-settings">
+       <label for="analysis-engine-select">
+         使用するエンジン
+       </label>
 
-        <select id="analysis-think-time">
-          <option value="1" selected>1秒</option>
-          <option value="3">3秒</option>
-          <option value="5">5秒</option>
-        </select>
-      </div>
+       <select id="analysis-engine-select">
+        <option value="suishou">水匠</option>
+        <option value="mini">つようら王11mini</option>
+        <option value="micro">つようら王11micro</option>
+      </select>
+    </div>
+
+    <div class="analysis-engine-settings">
+      <label for="analysis-think-time">
+        1局面あたりの解析時間
+      </label>
+
+      <select id="analysis-think-time">
+        <option value="1" selected>1秒</option>
+        <option value="3">3秒</option>
+        <option value="5">5秒</option>
+      </select>
+    </div>
 
       <div class="analysis-engine-actions">
         <button
@@ -289,11 +325,13 @@ const firstButton = document.querySelector("#goto-first");
 const backButton = document.querySelector("#go-back");
 const forwardButton = document.querySelector("#go-forward");
 const lastButton = document.querySelector("#goto-last");
+const engineSelect = document.querySelector("#analysis-engine-select");
 const thinkTimeSelect = document.querySelector("#analysis-think-time");
 const startAnalysisButton = document.querySelector("#start-analysis");
 const stopAnalysisButton = document.querySelector("#stop-analysis");
 const engineStatus = document.querySelector("#analysis-engine-status");
 const analysisProgress = document.querySelector("#analysis-progress");
+engineSelect.value = getSelectedEngineId();
 
 const analysisEngine = new AnalysisEngine({
   onStatus: ({ message }) => {
@@ -593,6 +631,7 @@ function loadKifu() {
 
       state.record = imported;
       state.moveNodes = nodes;
+      state.loadedKifuText = text;
       startAnalysisButton.disabled = false;
       state.analysisResults = [];
       renderAnalysisResults();
@@ -647,6 +686,49 @@ lastButton.addEventListener("click", () => {
 
 // 棋譜読み込み
 loadButton.addEventListener("click", loadKifu);
+engineSelect.addEventListener("change", () => {
+  const previousEngineId = getSelectedEngineId();
+  const nextEngineId = engineSelect.value;
+
+  if (!Object.hasOwn(ENGINE_OPTIONS, nextEngineId)) {
+    engineSelect.value = previousEngineId;
+    return;
+  }
+
+  if (nextEngineId === previousEngineId) return;
+
+  const reloadState = {
+    version: 1,
+    inputText: input.value,
+    loadedKifuText: state.loadedKifuText,
+    wasLoaded: Boolean(state.record),
+    thinkTime: thinkTimeSelect.value,
+  };
+
+  try {
+    sessionStorage.setItem(
+      ANALYSIS_RELOAD_STATE_KEY,
+      JSON.stringify(reloadState)
+    );
+
+    localStorage.setItem(ENGINE_STORAGE_KEY, nextEngineId);
+  } catch (error) {
+    try {
+      sessionStorage.removeItem(ANALYSIS_RELOAD_STATE_KEY);
+    } catch {
+      // 保存領域を利用できない場合は無視する。
+    }
+
+    engineSelect.value = previousEngineId;
+
+    engineStatus.textContent =
+      `エンジン設定を保存できませんでした：${error?.message || String(error)}`;
+
+    return;
+  }
+
+  window.location.reload();
+});
 
 // 入力のクリア
 clearButton.addEventListener("click", () => {
@@ -654,6 +736,7 @@ clearButton.addEventListener("click", () => {
 
   state.record = null;
   state.moveNodes = [];
+  state.loadedKifuText = "";
 
   meta.textContent = "棋譜はまだ読み込まれていません。";
   board.replaceChildren(
@@ -781,6 +864,7 @@ async function startAnalysis() {
   loadButton.disabled = true;
   clearButton.disabled = true;
   thinkTimeSelect.disabled = true;
+  engineSelect.disabled = true;
 
   analysisProgress.textContent = "解析準備中です。";
 
@@ -845,6 +929,7 @@ async function startAnalysis() {
     loadButton.disabled = false;
     clearButton.disabled = false;
     thinkTimeSelect.disabled = false;
+    engineSelect.disabled = false;
   }
 }
 
@@ -863,3 +948,46 @@ stopAnalysisButton.addEventListener("click", async () => {
     console.error("解析停止エラー:", error);
   }
 });
+
+function restoreAnalysisPageState() {
+  let saved = null;
+
+  try {
+    const raw = sessionStorage.getItem(
+      ANALYSIS_RELOAD_STATE_KEY
+    );
+
+    if (!raw) return;
+
+    sessionStorage.removeItem(ANALYSIS_RELOAD_STATE_KEY);
+    saved = JSON.parse(raw);
+  } catch (error) {
+    console.error("解析画面の状態復元に失敗しました:", error);
+    return;
+  }
+
+  if (saved?.version !== 1) return;
+
+  const inputText =
+    typeof saved.inputText === "string"
+      ? saved.inputText
+      : "";
+
+  input.value = inputText;
+
+  if (VALID_ANALYSIS_TIMES.includes(String(saved.thinkTime))) {
+    thinkTimeSelect.value = String(saved.thinkTime);
+  }
+
+  if (
+    saved.wasLoaded === true &&
+    typeof saved.loadedKifuText === "string" &&
+    saved.loadedKifuText.trim()
+  ) {
+    input.value = saved.loadedKifuText;
+    loadKifu();
+    input.value = inputText;
+  }
+}
+
+restoreAnalysisPageState();
