@@ -14,10 +14,11 @@ export default defineConfig({
 
   build: {
     rollupOptions: {
-      input: {
-        main: resolve(process.cwd(), 'index.html'),
-        game: resolve(process.cwd(), 'game.html')
-      }
+     input: {
+      main: resolve(process.cwd(), 'index.html'),
+      game: resolve(process.cwd(), 'game.html'),
+      analysis: resolve(process.cwd(), 'analysis.html')
+     }
     }
   }
 });
