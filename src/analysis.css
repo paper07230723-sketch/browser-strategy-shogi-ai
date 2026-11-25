@@ -1,0 +1,395 @@
+
+:root {
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  color: #202820;
+  background: #f4f6f4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: #f4f6f4;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.analysis-shell {
+  width: min(100% - 28px, 1100px);
+  margin: 0 auto;
+  padding: 22px 0 48px;
+}
+
+.analysis-header {
+  margin-bottom: 22px;
+}
+
+.analysis-back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: #286342;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.analysis-back-link:focus-visible {
+  outline: 3px solid #286342;
+  outline-offset: 4px;
+}
+
+.analysis-header h1 {
+  margin: 0;
+  font-size: clamp(25px, 5vw, 34px);
+}
+
+.analysis-description {
+  margin: 9px 0 0;
+  color: #69736b;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.analysis-card {
+  min-width: 0;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #dce4dd;
+  border-radius: 15px;
+  box-shadow: 0 3px 12px #243e2d08;
+}
+
+.analysis-card h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+.analysis-input-card {
+  margin-bottom: 20px;
+}
+
+.analysis-input-help {
+  margin: -5px 0 12px;
+  color: #69736b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.analysis-kifu-input {
+  display: block;
+  width: 100%;
+  min-height: 190px;
+  padding: 13px;
+  resize: vertical;
+  color: #202820;
+  background: #fbfcfb;
+  border: 1px solid #cbd6cd;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.analysis-kifu-input:focus {
+  outline: 2px solid #4d8b65;
+  outline-offset: 2px;
+}
+
+.analysis-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 13px;
+}
+
+.analysis-button {
+  min-height: 43px;
+  padding: 10px 17px;
+  color: #26352a;
+  background: #edf2ee;
+  border: 1px solid #cbd8cd;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.analysis-button--primary {
+  color: #fff;
+  background: #276342;
+  border-color: #1b5134;
+}
+
+.analysis-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.analysis-button:focus-visible,
+.analysis-move-button:focus-visible {
+  outline: 3px solid #6ca27e;
+  outline-offset: 3px;
+}
+
+.analysis-notice {
+  margin-top: 12px;
+  padding: 11px 13px;
+  color: #48564b;
+  background: #f0f3f0;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.analysis-notice--error {
+  color: #922d2d;
+  background: #fff0f0;
+}
+
+.analysis-notice--success {
+  color: #245a37;
+  background: #edf7ef;
+}
+
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 350px);
+  gap: 20px;
+  align-items: start;
+}
+
+.analysis-board-card {
+  min-width: 0;
+}
+
+.analysis-record-meta {
+  margin-bottom: 14px;
+  color: #667168;
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.analysis-board-area {
+  width: min(100%, 550px);
+  margin: 0 auto;
+}
+
+.analysis-hand {
+  min-height: 54px;
+  margin: 9px 0;
+  padding: 9px 11px;
+  background: #f8f2e6;
+  border: 1px solid #dfc999;
+  border-radius: 8px;
+}
+
+.analysis-hand-title {
+  margin-bottom: 5px;
+  color: #79623b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.analysis-hand-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.analysis-hand-empty {
+  color: #92958e;
+  font-size: 13px;
+}
+
+.analysis-board {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid #634b28;
+  background: #d6a64f;
+}
+
+.analysis-square {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border-right: 1px solid #8b6935;
+  border-bottom: 1px solid #8b6935;
+  background: #f0d394;
+}
+
+.analysis-square.is-dark {
+  background: #e4bd72;
+}
+
+.analysis-piece {
+  display: block;
+  color: #20180e;
+  font-size: clamp(17px, 4.4vw, 36px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.analysis-piece.is-white {
+  transform: rotate(180deg);
+}
+
+.analysis-coordinate {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  color: #765a30;
+  font-size: clamp(7px, 1.5vw, 10px);
+  opacity: 0.7;
+}
+
+.analysis-navigation {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 15px;
+}
+
+.analysis-navigation .analysis-button {
+  min-width: 0;
+  padding: 9px 5px;
+  font-size: 13px;
+}
+
+.analysis-position-status {
+  margin-top: 12px;
+  padding: 11px;
+  background: #f0f4f0;
+  border-radius: 8px;
+  color: #415046;
+  font-size: 13px;
+  text-align: center;
+}
+
+.analysis-move-card {
+  margin-top: 20px;
+}
+
+.analysis-move-list {
+  display: grid;
+  max-height: 350px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: 5px;
+}
+
+.analysis-move-button {
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 11px;
+  color: #303b32;
+  background: #f5f7f5;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.analysis-move-button.is-current {
+  color: #174f30;
+  background: #e4f1e7;
+  border-color: #77a786;
+  font-weight: 800;
+}
+
+.analysis-move-number {
+  min-width: 30px;
+  color: #79827b;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-placeholder {
+  padding: 18px 12px;
+  color: #8a918b;
+  background: #f6f7f6;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+  text-align: center;
+}
+
+.analysis-footer {
+  margin-top: 24px;
+  color: #89928b;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .analysis-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-board-card {
+    order: 1;
+  }
+
+  .analysis-move-card {
+    order: 2;
+  }
+
+  .analysis-board-area {
+    width: min(100%, 520px);
+  }
+}
+
+@media (max-width: 430px) {
+  .analysis-shell {
+    width: min(100% - 18px, 1100px);
+    padding-top: 15px;
+  }
+
+  .analysis-card {
+    padding: 13px;
+    border-radius: 12px;
+  }
+
+  .analysis-kifu-input {
+    min-height: 165px;
+    font-size: 13px;
+  }
+
+  .analysis-navigation {
+    gap: 5px;
+  }
+
+  .analysis-navigation .analysis-button {
+    font-size: 12px;
+  }
+}
