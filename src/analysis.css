@@ -393,3 +393,55 @@ button {
     font-size: 12px;
   }
 }
+
+.analysis-engine-card {
+  margin-top: 20px;
+}
+
+.analysis-engine-description {
+  color: #68736a;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.analysis-engine-settings {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.analysis-engine-settings select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #cbd3cc;
+  border-radius: 7px;
+  background: #fff;
+  color: #303b32;
+  font: inherit;
+}
+
+.analysis-engine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.analysis-engine-actions .analysis-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.analysis-progress {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f5f7f5;
+  color: #415046;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
