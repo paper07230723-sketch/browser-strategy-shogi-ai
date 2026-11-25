@@ -1,12 +1,14 @@
 
 import "./analysis.css";
 import {
+  Color,
+  PieceType,
+  Square,
   importKIF,
   pieceTypeToStringForBoard,
   getBlackPlayerName,
   getWhitePlayerName,
 } from "tsshogi";
-
 const app = document.querySelector("#app");
 
 if (!app) {
@@ -17,15 +19,14 @@ const MAX_KIF_CHARACTERS = 250_000;
 const MAX_MOVE_COUNT = 3_000;
 
 const HAND_PIECES = [
-  "rook",
-  "bishop",
-  "gold",
-  "silver",
-  "knight",
-  "lance",
-  "pawn",
+  PieceType.ROOK,
+  PieceType.BISHOP,
+  PieceType.GOLD,
+  PieceType.SILVER,
+  PieceType.KNIGHT,
+  PieceType.LANCE,
+  PieceType.PAWN,
 ];
-
 const state = {
   record: null,
   moveNodes: [],
@@ -300,15 +301,13 @@ function renderHand(color, containerId, label) {
 
 function renderBoard() {
   const position = state.record.position;
-  const squares = position.board.squares;
-
   const fragment = document.createDocumentFragment();
 
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
-      const index = row * 9 + col;
-      const piece = squares[index];
-
+      const file = 9 - col;
+      const rank = row + 1;
+      const piece = position.board.at(new Square(file, rank));
       const square = element(
         "div",
         `analysis-square${(row + col) % 2 ? " is-dark" : ""}`
@@ -323,7 +322,7 @@ function renderBoard() {
         "aria-label",
         `${file}筋${rank}段 ${
           piece
-            ? `${piece.color === "black" ? "先手" : "後手"}の${pieceTypeToStringForBoard(piece.type)}`
+            ? `${piece.color === Color.BLACK ? "先手" : "後手"}の${pieceTypeToStringForBoard(piece.type)}`
             : "空き"
         }`
       );
@@ -331,7 +330,7 @@ function renderBoard() {
       if (piece) {
         const pieceElement = element(
           "span",
-          `analysis-piece${piece.color === "white" ? " is-white" : ""}`,
+          `analysis-piece${piece.color === Color.WHITE ? " is-white" : ""}`,
           pieceTypeToStringForBoard(piece.type)
         );
 
@@ -359,13 +358,13 @@ function renderBoard() {
   board.replaceChildren(fragment);
 
   renderHand(
-    "white",
+    Color.WHITE,
     "analysis-hand-white",
     "後手の持ち駒"
   );
 
   renderHand(
-    "black",
+    Color.BLACK,
     "analysis-hand-black",
     "先手の持ち駒"
   );
@@ -400,7 +399,7 @@ function renderPosition() {
   renderBoard();
 
   const turn =
-    record.position.color === "black" ? "先手" : "後手";
+    record.position.color === Color.BLACK ? "先手" : "後手";
 
   positionStatus.textContent =
     current.ply === 0
