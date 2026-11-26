@@ -845,6 +845,67 @@ function formatEvaluation(info) {
   return `評価値：${displayValue}cp（${advantage}）`;
 }
 
+const WIN_RATE_CP_SCALE = 600;
+
+function getSenteWinRate(info) {
+  if (!info?.score || !Number.isFinite(info.score.value)) {
+    return null;
+  }
+
+  const { type, value } = info.score;
+
+  if (type === "mate") {
+    if (value === 0) return null;
+    return value > 0 ? 100 : 0;
+  }
+
+  if (type !== "cp") return null;
+
+  const exponent = Math.max(
+    -50,
+    Math.min(50, -value / WIN_RATE_CP_SCALE)
+  );
+
+  return 100 / (1 + Math.exp(exponent));
+}
+
+function getMoveJudgment(result, resultsByPly) {
+  if (result.ply === 0) return "—";
+
+  const previousResult = resultsByPly.get(result.ply - 1);
+
+  if (!previousResult) return "—";
+
+  const beforeSenteWinRate = getSenteWinRate(previousResult.info);
+  const afterSenteWinRate = getSenteWinRate(result.info);
+
+  if (
+    beforeSenteWinRate === null ||
+    afterSenteWinRate === null
+  ) {
+    return "—";
+  }
+
+  const moverSign = previousResult.sentePerspectiveSign;
+
+  const beforeMoverWinRate =
+    moverSign === 1
+      ? beforeSenteWinRate
+      : 100 - beforeSenteWinRate;
+
+  const afterMoverWinRate =
+    moverSign === 1
+      ? afterSenteWinRate
+      : 100 - afterSenteWinRate;
+
+  const winRateDrop = beforeMoverWinRate - afterMoverWinRate;
+
+  if (winRateDrop >= 10) return "悪手";
+  if (winRateDrop >= 5) return "疑問手";
+
+  return "—";
+}
+
 
 
 const SPECIAL_BEST_MOVE_LABELS = Object.freeze({
@@ -914,6 +975,7 @@ function collectAnalysisPositions() {
 }
 
 
+
 function renderAnalysisResults() {
   const fragment = document.createDocumentFragment();
 
@@ -923,22 +985,27 @@ function renderAnalysisResults() {
   for (const label of [
     "手数",
     "指し手",
-    "評価値",
+    "判定",
     "推奨手",
+    "評価値",
     "深さ",
   ]) {
-    header.appendChild(
-      element("span", "", label)
-    );
+    header.appendChild(element("span", "", label));
   }
 
   list.appendChild(header);
+
+  const resultsByPly = new Map(
+    state.analysisResults.map((result) => [result.ply, result])
+  );
 
   for (const result of state.analysisResults) {
     const row = element("button", "analysis-results-row");
 
     row.type = "button";
     row.dataset.ply = String(result.ply);
+
+    const previousResult = resultsByPly.get(result.ply - 1);
 
     const ply = element(
       "span",
@@ -952,20 +1019,28 @@ function renderAnalysisResults() {
       formatPlayedMove(result.move, result.sentePerspectiveSign)
     );
 
-    const evaluation = element(
+    const judgment = element(
       "span",
-      "analysis-result-evaluation",
-      formatEvaluation(result.info).replace(/^評価値：/, "")
+      "analysis-result-judgment",
+      getMoveJudgment(result, resultsByPly)
     );
 
     const bestMove = element(
       "span",
       "analysis-result-bestmove",
-      formatBestMove(
-        result.sfen,
-        result.bestmove,
-        result.sentePerspectiveSign
-      )
+      previousResult
+        ? formatBestMove(
+            previousResult.sfen,
+            previousResult.bestmove,
+            previousResult.sentePerspectiveSign
+          )
+        : "—"
+    );
+
+    const evaluation = element(
+      "span",
+      "analysis-result-evaluation",
+      formatEvaluation(result.info).replace(/^評価値：/, "")
     );
 
     const depth = element(
@@ -974,11 +1049,11 @@ function renderAnalysisResults() {
       result.info?.depth ?? "—"
     );
 
-    row.append(ply, move, evaluation, bestMove, depth);
+    row.append(ply, move, judgment, bestMove, evaluation, depth);
 
     row.setAttribute(
       "aria-label",
-      `${result.ply === 0 ? "開始局面" : `${result.ply}手目`}、指し手 ${move.textContent}、評価値 ${evaluation.textContent}、推奨手 ${bestMove.textContent}、探索深さ ${depth.textContent}`
+      `${result.ply === 0 ? "開始局面" : `${result.ply}手目`}、指し手 ${move.textContent}、判定 ${judgment.textContent}、推奨手 ${bestMove.textContent}、評価値 ${evaluation.textContent}、探索深さ ${depth.textContent}`
     );
 
     row.addEventListener("click", () => {
@@ -1010,6 +1085,7 @@ function renderAnalysisResults() {
 
   analysisProgress.replaceChildren(fragment);
 }
+
 
 async function startAnalysis() {
   if (!state.record || state.analysisRunning) return;
