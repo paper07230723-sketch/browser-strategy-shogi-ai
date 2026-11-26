@@ -445,3 +445,85 @@ button {
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
+
+
+/* 解析結果一覧 */
+.analysis-results-list {
+  width: 100%;
+  margin-top: 12px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid #dce4dd;
+  border-radius: 8px;
+}
+
+.analysis-results-header,
+.analysis-results-row {
+  display: grid;
+  grid-template-columns: 68px 90px 82px minmax(110px, 1fr) 48px;
+  align-items: center;
+  gap: 8px;
+  min-width: 480px;
+  padding: 10px 12px;
+}
+
+.analysis-results-header {
+  color: #68736a;
+  background: #edf2ee;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.analysis-results-row {
+  width: 100%;
+  min-height: 43px;
+  color: #303b32;
+  background: #fff;
+  border: 0;
+  border-top: 1px solid #e5eae5;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.analysis-results-row:hover {
+  background: #f4f8f4;
+}
+
+.analysis-results-row:focus-visible {
+  position: relative;
+  outline: 3px solid #6ca27e;
+  outline-offset: -3px;
+}
+
+.analysis-result-ply {
+  color: #68736a;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.analysis-result-move {
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.analysis-result-evaluation,
+.analysis-result-depth {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.analysis-result-bestmove {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  .analysis-results-header,
+  .analysis-results-row {
+    padding-right: 9px;
+    padding-left: 9px;
+    gap: 6px;
+  }
+}
