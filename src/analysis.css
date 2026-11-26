@@ -520,10 +520,31 @@ button {
 }
 
 @media (max-width: 430px) {
-  .analysis-results-header,
-  .analysis-results-row {
-    padding-right: 9px;
-    padding-left: 9px;
-    gap: 6px;
-  }
+  
+.analysis-results-header,
+.analysis-results-row {
+  display: grid;
+  grid-template-columns: 68px 84px minmax(145px, 1.2fr) minmax(145px, 1.2fr) 48px;
+  align-items: center;
+  gap: 8px;
+  min-width: 560px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+}
+
+.analysis-results-header > *,
+.analysis-results-row > * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.analysis-result-evaluation {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.analysis-result-bestmove {
+  font-weight: 650;
+  white-space: nowrap;
+}
 }

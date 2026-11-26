@@ -803,6 +803,7 @@ function normalizeInfoToSentePerspective(info, sentePerspectiveSign) {
   };
 }
 
+
 function formatEvaluation(info) {
   if (!info?.score || !Number.isFinite(info.score.value)) {
     return "評価値：取得できませんでした";
@@ -817,17 +818,32 @@ function formatEvaluation(info) {
 
     const winner = value > 0 ? "先手" : "後手";
 
-    return `${winner}勝ち（詰みまで ${Math.abs(value)} 手）`;
+    return `${winner}勝ち（詰み読み切り）`;
   }
 
   const displayValue = value > 0 ? `+${value}` : String(value);
-  const advantage =
-    value > 0 ? "先手有利" :
-    value < 0 ? "後手有利" :
-    "互角";
 
-  return `評価値：${displayValue} cp（${advantage}）`;
+  let advantage;
+
+  if (value >= 1500) {
+    advantage = "先手勝勢";
+  } else if (value >= 800) {
+    advantage = "先手優勢";
+  } else if (value >= 300) {
+    advantage = "先手有利";
+  } else if (value <= -1500) {
+    advantage = "後手勝勢";
+  } else if (value <= -800) {
+    advantage = "後手優勢";
+  } else if (value <= -300) {
+    advantage = "後手有利";
+  } else {
+    advantage = "互角";
+  }
+
+  return `評価値：${displayValue}cp（${advantage}）`;
 }
+
 
 
 const SPECIAL_BEST_MOVE_LABELS = Object.freeze({
@@ -857,10 +873,7 @@ function formatBestMove(sfen, bestmove, sentePerspectiveSign) {
     return bestmove;
   }
 
-  const moveText = record.current.displayText || bestmove;
-  const turnMark = sentePerspectiveSign === 1 ? "▲" : "△";
-
-  return `${turnMark}${moveText}`;
+  return record.current.displayText || bestmove;
 }
 
 function formatPlayedMove(move, sentePerspectiveSign) {
@@ -868,10 +881,7 @@ function formatPlayedMove(move, sentePerspectiveSign) {
     return "—";
   }
 
-  const previousMoveSign = -sentePerspectiveSign;
-  const turnMark = previousMoveSign === 1 ? "▲" : "△";
-
-  return `${turnMark}${move}`;
+  return move;
 }
 
 
