@@ -3,6 +3,7 @@ import "./analysis.css";
 import { AnalysisEngine } from "./analysis-engine.js";
 import {
   Color,
+  Record,
   PieceType,
   Square,
   importKIF,
@@ -829,6 +830,36 @@ function formatEvaluation(info) {
 }
 
 
+const SPECIAL_BEST_MOVE_LABELS = Object.freeze({
+  resign: "投了",
+  win: "入玉宣言",
+  draw: "引き分け",
+  rep_draw: "千日手",
+  timeout: "時間切れ",
+  break: "中断",
+  "0000": "候補手なし",
+});
+
+function formatBestMove(sfen, bestmove) {
+  if (!bestmove) {
+    return "取得できませんでした";
+  }
+
+  if (Object.hasOwn(SPECIAL_BEST_MOVE_LABELS, bestmove)) {
+    return SPECIAL_BEST_MOVE_LABELS[bestmove];
+  }
+
+  const record = Record.newByUSI(
+    `sfen ${sfen} moves ${bestmove}`
+  );
+
+  if (record instanceof Error || record.current.ply === 0) {
+    return bestmove;
+  }
+
+  return record.current.displayText || bestmove;
+}
+
 
 function collectAnalysisPositions() {
   const record = state.record;
@@ -867,10 +898,14 @@ function renderAnalysisResults() {
       "analysis-progress"
     );
 
+    const headingText = result.ply === 0
+      ? "開始局面（対局開始前）"
+      : `${result.ply}手目を指した後の局面（${result.move}）`;
+
     const heading = element(
       "strong",
       "",
-      `${result.ply}手目：${result.move}`
+      headingText
     );
 
     const evaluation = element(
@@ -882,7 +917,7 @@ function renderAnalysisResults() {
     const bestMove = element(
       "div",
       "",
-      `推奨手：${result.bestmove || "なし"}`
+      `推奨手：${formatBestMove(result.sfen, result.bestmove)}`
     );
 
     const depth = element(
@@ -948,6 +983,7 @@ async function startAnalysis() {
       state.analysisResults.push({
         ply: position.ply,
         move: position.move,
+        sfen: position.sfen,
         bestmove: result.bestmove,
         info: normalizeInfoToSentePerspective(
           result.info,
