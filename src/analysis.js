@@ -730,6 +730,7 @@ engineSelect.addEventListener("change", () => {
   window.location.reload();
 });
 
+
 // 入力のクリア
 clearButton.addEventListener("click", () => {
   input.value = "";
@@ -737,8 +738,11 @@ clearButton.addEventListener("click", () => {
   state.record = null;
   state.moveNodes = [];
   state.loadedKifuText = "";
+  state.analysisResults = [];
+  state.analysisCancelled = false;
 
   meta.textContent = "棋譜はまだ読み込まれていません。";
+
   board.replaceChildren(
     element(
       "div",
@@ -765,10 +769,22 @@ clearButton.addEventListener("click", () => {
 
   positionStatus.textContent = "開始局面";
 
+  analysisProgress.replaceChildren(
+    element(
+      "div",
+      "analysis-placeholder",
+      "解析結果はまだありません。"
+    )
+  );
+
+  startAnalysisButton.disabled = true;
+  stopAnalysisButton.disabled = true;
+
   updateNavigation();
 
   showNotice("入力と読み込んだ棋譜をクリアしました。");
 });
+
 
 updateNavigation();
 
