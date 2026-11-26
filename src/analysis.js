@@ -840,7 +840,7 @@ const SPECIAL_BEST_MOVE_LABELS = Object.freeze({
   "0000": "候補手なし",
 });
 
-function formatBestMove(sfen, bestmove) {
+function formatBestMove(sfen, bestmove, sentePerspectiveSign) {
   if (!bestmove) {
     return "取得できませんでした";
   }
@@ -857,7 +857,21 @@ function formatBestMove(sfen, bestmove) {
     return bestmove;
   }
 
-  return record.current.displayText || bestmove;
+  const moveText = record.current.displayText || bestmove;
+  const turnMark = sentePerspectiveSign === 1 ? "▲" : "△";
+
+  return `${turnMark}${moveText}`;
+}
+
+function formatPlayedMove(move, sentePerspectiveSign) {
+  if (!move || move === "開始局面") {
+    return "—";
+  }
+
+  const previousMoveSign = -sentePerspectiveSign;
+  const turnMark = previousMoveSign === 1 ? "▲" : "△";
+
+  return `${turnMark}${move}`;
 }
 
 
@@ -892,48 +906,95 @@ function collectAnalysisPositions() {
 function renderAnalysisResults() {
   const fragment = document.createDocumentFragment();
 
+  const list = element("div", "analysis-results-list");
+  const header = element("div", "analysis-results-header");
+
+  for (const label of [
+    "手数",
+    "指し手",
+    "評価値",
+    "推奨手",
+    "深さ",
+  ]) {
+    header.appendChild(
+      element("span", "", label)
+    );
+  }
+
+  list.appendChild(header);
+
   for (const result of state.analysisResults) {
-    const item = element(
-      "div",
-      "analysis-progress"
+    const row = element("button", "analysis-results-row");
+
+    row.type = "button";
+    row.dataset.ply = String(result.ply);
+
+    const ply = element(
+      "span",
+      "analysis-result-ply",
+      result.ply === 0 ? "開始" : `${result.ply}手目`
     );
 
-    const headingText = result.ply === 0
-      ? "開始局面"
-      : `${result.ply}手目`;
-
-    const heading = element(
-      "strong",
-      "",
-      headingText
+    const move = element(
+      "span",
+      "analysis-result-move",
+      formatPlayedMove(result.move, result.sentePerspectiveSign)
     );
 
     const evaluation = element(
-      "div",
-      "",
-      formatEvaluation(result.info)
+      "span",
+      "analysis-result-evaluation",
+      formatEvaluation(result.info).replace(/^評価値：/, "")
     );
 
     const bestMove = element(
-      "div",
-      "",
-      `推奨手：${formatBestMove(result.sfen, result.bestmove)}`
+      "span",
+      "analysis-result-bestmove",
+      formatBestMove(
+        result.sfen,
+        result.bestmove,
+        result.sentePerspectiveSign
+      )
     );
 
     const depth = element(
-      "div",
-      "",
-      `探索深さ：${result.info?.depth ?? "不明"}`
+      "span",
+      "analysis-result-depth",
+      result.info?.depth ?? "—"
     );
 
-    item.append(heading, evaluation, bestMove, depth);
-    fragment.appendChild(item);
+    row.append(ply, move, evaluation, bestMove, depth);
+
+    row.setAttribute(
+      "aria-label",
+      `${result.ply === 0 ? "開始局面" : `${result.ply}手目`}、指し手 ${move.textContent}、評価値 ${evaluation.textContent}、推奨手 ${bestMove.textContent}、探索深さ ${depth.textContent}`
+    );
+
+    row.addEventListener("click", () => {
+      if (!state.record) return;
+
+      state.record.goto(result.ply);
+      renderPosition();
+
+      row.scrollIntoView({
+        block: "nearest",
+        behavior: "auto",
+      });
+    });
+
+    list.appendChild(row);
   }
 
   if (state.analysisResults.length === 0) {
     fragment.appendChild(
-      element("div", "analysis-placeholder", "解析結果はまだありません。")
+      element(
+        "div",
+        "analysis-placeholder",
+        "解析結果はまだありません。"
+      )
     );
+  } else {
+    fragment.appendChild(list);
   }
 
   analysisProgress.replaceChildren(fragment);
@@ -983,6 +1044,7 @@ async function startAnalysis() {
       state.analysisResults.push({
         ply: position.ply,
         move: position.move,
+        senteperspectivesign: position.sentePerspectiveSign,
         sfen: position.sfen,
         bestmove: result.bestmove,
         info: normalizeInfoToSentePerspective(
