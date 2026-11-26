@@ -812,14 +812,15 @@ function formatEvaluation(info) {
   const { type, value } = info.score;
 
   if (type === "mate") {
-    if (value === 0) {
-      return "詰み判定（手数0）";
-    }
-
-    const winner = value > 0 ? "先手" : "後手";
-
-    return `${winner}勝ち（詰み読み切り）`;
+  if (value === 0) {
+    return "詰み判定（手数0）";
   }
+
+  const winner = value > 0 ? "先手" : "後手";
+  const mateMoves = Math.abs(value);
+
+  return `${winner}勝ち（${mateMoves}手詰み）`;
+}
 
   const displayValue = value > 0 ? `+${value}` : String(value);
 
