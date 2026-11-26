@@ -899,8 +899,8 @@ function renderAnalysisResults() {
     );
 
     const headingText = result.ply === 0
-      ? "開始局面（対局開始前）"
-      : `${result.ply}手目を指した後の局面（${result.move}）`;
+      ? "開始局面"
+      : `${result.ply}手目`;
 
     const heading = element(
       "strong",
