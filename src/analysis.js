@@ -1055,7 +1055,7 @@ async function startAnalysis() {
       state.analysisResults.push({
         ply: position.ply,
         move: position.move,
-        sentepersPectivesign: position.sentePerspectiveSign,
+        sentePerspectivesign: position.sentePerspectiveSign,
         sfen: position.sfen,
         bestmove: result.bestmove,
         info: normalizeInfoToSentePerspective(
