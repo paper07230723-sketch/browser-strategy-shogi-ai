@@ -771,15 +771,48 @@ clearButton.addEventListener("click", () => {
 });
 
 updateNavigation();
-function formatEvaluation(info) {
-  if (!info?.score) return "評価値：取得できませんでした";
 
-  if (info.score.type === "mate") {
-    return `詰みまで ${info.score.value} 手`;
+function normalizeInfoToSentePerspective(info, sentePerspectiveSign) {
+  if (!info?.score || !Number.isFinite(info.score.value)) {
+    return info;
   }
 
-  return `評価値：${info.score.value} cp`;
+  return {
+    ...info,
+    score: {
+      ...info.score,
+      value: info.score.value * sentePerspectiveSign,
+    },
+  };
 }
+
+function formatEvaluation(info) {
+  if (!info?.score || !Number.isFinite(info.score.value)) {
+    return "評価値：取得できませんでした";
+  }
+
+  const { type, value } = info.score;
+
+  if (type === "mate") {
+    if (value === 0) {
+      return "詰み判定（手数0）";
+    }
+
+    const winner = value > 0 ? "先手" : "後手";
+
+    return `${winner}勝ち（詰みまで ${Math.abs(value)} 手）`;
+  }
+
+  const displayValue = value > 0 ? `+${value}` : String(value);
+  const advantage =
+    value > 0 ? "先手有利" :
+    value < 0 ? "後手有利" :
+    "互角";
+
+  return `評価値：${displayValue} cp（${advantage}）`;
+}
+
+
 
 function collectAnalysisPositions() {
   const record = state.record;
@@ -796,6 +829,8 @@ function collectAnalysisPositions() {
         move: ply === 0
           ? "開始局面"
           : record.current.displayText,
+        sentePerspectiveSign:
+          record.position.color === Color.BLACK ? 1 : -1,
       });
     }
   } finally {
@@ -805,6 +840,7 @@ function collectAnalysisPositions() {
 
   return positions;
 }
+
 
 function renderAnalysisResults() {
   const fragment = document.createDocumentFragment();
@@ -897,7 +933,10 @@ async function startAnalysis() {
         ply: position.ply,
         move: position.move,
         bestmove: result.bestmove,
-        info: result.info,
+        info: normalizeInfoToSentePerspective(
+          result.info,
+          position.sentePerspectiveSign
+        ),
       });
 
       renderAnalysisResults();
