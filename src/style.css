@@ -391,3 +391,24 @@ button {
   font-weight: 800;
   cursor: pointer;
 }
+
+/* ホームへ戻るリンク */
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 16px;
+  color: #17683f;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.home-link:hover {
+  text-decoration: underline;
+}
+
+.home-link:focus-visible {
+  outline: 3px solid #6ca27e;
+  outline-offset: 4px;
+  border-radius: 3px;
+}

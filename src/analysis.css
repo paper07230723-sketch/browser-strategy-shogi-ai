@@ -246,10 +246,6 @@ button {
   background: #f0d394;
 }
 
-.analysis-square.is-dark {
-  background: #e4bd72;
-}
-
 .analysis-piece {
   display: block;
   color: #20180e;
@@ -490,6 +486,13 @@ button {
   background: #f4f8f4;
 }
 
+.analysis-results-row.is-current {
+  color: #174f30;
+  background: #e4f1e7;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px #77a786;
+}
+
 .analysis-results-row:focus-visible {
   position: relative;
   outline: 3px solid #6ca27e;
@@ -686,4 +689,12 @@ button {
   outline: none;
   stroke: #26352a;
   stroke-width: 3;
+}
+
+
+.analysis-chart-current-position-line {
+  stroke: #1f6b42;
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
 }

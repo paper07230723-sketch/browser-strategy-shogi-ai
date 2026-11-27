@@ -1114,6 +1114,29 @@ function createBoard() {
 
 function createApp() {
   const container = makeElement('main', 'container');
+
+  const homeLink = makeElement(
+    'a',
+    'home-link',
+    '← ホームに戻る'
+  );
+
+  homeLink.href = './index.html';
+
+  homeLink.addEventListener('click', (event) => {
+    if (gameStarted && !gamePaused && !gameOver) {
+      const shouldLeave = window.confirm(
+        '対局中です。ホームに戻ると現在の対局は保存されず終了します。ホームに戻りますか？'
+      );
+
+      if (!shouldLeave) {
+        event.preventDefault();
+      }
+    }
+  });
+
+  container.appendChild(homeLink);
+
   container.appendChild(makeElement('h1', '', '戦型指定型将棋AI'));
   container.appendChild(makeElement('p', 'subtitle', '駒の移動テスト版'));
 

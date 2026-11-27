@@ -63,6 +63,8 @@ const state = {
   analysisResults: [],
 };
 
+let evaluationChart = null;
+
 const element = (tag, className, text) => {
   const node = document.createElement(tag);
 
@@ -420,7 +422,7 @@ function renderBoard() {
       const piece = position.board.at(new Square(file, rank));
       const square = element(
         "div",
-        `analysis-square${(row + col) % 2 ? " is-dark" : ""}`
+        "analysis-square"
       );
 
       square.setAttribute("role", "gridcell");
@@ -477,11 +479,13 @@ function renderBoard() {
   );
 }
 
+
 function updateMoveSelection() {
   if (!state.record) return;
 
   const currentPly = state.record.current.ply;
 
+  // 指し手一覧の選択状態を更新
   for (const button of moveList.querySelectorAll(
     ".analysis-move-button"
   )) {
@@ -495,7 +499,23 @@ function updateMoveSelection() {
       button.removeAttribute("aria-current");
     }
   }
+
+  // 解析結果表の選択状態を更新
+  for (const row of analysisProgress.querySelectorAll(
+    ".analysis-results-row"
+  )) {
+    const selected = Number(row.dataset.ply) === currentPly;
+
+    row.classList.toggle("is-current", selected);
+
+    if (selected) {
+      row.setAttribute("aria-current", "step");
+    } else {
+      row.removeAttribute("aria-current");
+    }
+  }
 }
+
 
 function renderPosition() {
   if (!state.record) return;
@@ -515,6 +535,7 @@ function renderPosition() {
 
   updateNavigation();
   updateMoveSelection();
+    evaluationChart?.setCurrentPly(current.ply);
 }
 
 function renderMoveList() {
@@ -978,6 +999,8 @@ function collectAnalysisPositions() {
 
 
 function renderAnalysisResults() {
+  evaluationChart = null;
+
   const fragment = document.createDocumentFragment();
 
   const list = element("div", "analysis-results-list");
@@ -1081,7 +1104,7 @@ function renderAnalysisResults() {
       )
     );
     } else {
-    const chart = createEvaluationChart({
+        const chart = createEvaluationChart({
       results: state.analysisResults,
       resultsByPly,
       getMoveJudgment,
@@ -1093,10 +1116,14 @@ function renderAnalysisResults() {
       },
     });
 
+    evaluationChart = chart;
+    chart.setCurrentPly(state.record?.current.ply ?? 0);
+
     fragment.append(chart, list);
   }
 
   analysisProgress.replaceChildren(fragment);
+  updateMoveSelection();
 }
 
 
