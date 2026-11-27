@@ -63,6 +63,8 @@ const state = {
   analysisResults: [],
 };
 
+let evaluationChart = null;
+
 const element = (tag, className, text) => {
   const node = document.createElement(tag);
 
@@ -515,6 +517,7 @@ function renderPosition() {
 
   updateNavigation();
   updateMoveSelection();
+    evaluationChart?.setCurrentPly(current.ply);
 }
 
 function renderMoveList() {
@@ -978,6 +981,8 @@ function collectAnalysisPositions() {
 
 
 function renderAnalysisResults() {
+  evaluationChart = null;
+
   const fragment = document.createDocumentFragment();
 
   const list = element("div", "analysis-results-list");
@@ -1081,7 +1086,7 @@ function renderAnalysisResults() {
       )
     );
     } else {
-    const chart = createEvaluationChart({
+        const chart = createEvaluationChart({
       results: state.analysisResults,
       resultsByPly,
       getMoveJudgment,
@@ -1092,6 +1097,9 @@ function renderAnalysisResults() {
         renderPosition();
       },
     });
+
+    evaluationChart = chart;
+    chart.setCurrentPly(state.record?.current.ply ?? 0);
 
     fragment.append(chart, list);
   }

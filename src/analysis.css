@@ -687,3 +687,11 @@ button {
   stroke: #26352a;
   stroke-width: 3;
 }
+
+
+.analysis-chart-current-position-line {
+  stroke: #1f6b42;
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}

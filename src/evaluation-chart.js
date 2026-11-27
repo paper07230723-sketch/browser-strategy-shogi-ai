@@ -240,6 +240,18 @@ export function createEvaluationChart({
 
   drawSegment();
 
+  // 現在表示している局面を示す垂直線
+  const currentPositionLine = createSvgElement("line", {
+    x1: xPosition(0),
+    y1: PLOT.top,
+    x2: xPosition(0),
+    y2: PLOT.top + plotHeight,
+    class: "analysis-chart-current-position-line",
+    "pointer-events": "none",
+  });
+
+  svg.appendChild(currentPositionLine);
+
   // 各局面のマーカー
   for (const { result, point } of points) {
     const judgment = getMoveJudgment(
@@ -343,6 +355,30 @@ export function createEvaluationChart({
       onSelectPly?.(nearest.result.ply);
     }
   });
+
+
+  // 現在の手数に合わせて垂直線を更新する。
+  card.setCurrentPly = (ply) => {
+    const currentPly = Number(ply);
+
+    if (
+      !Number.isFinite(currentPly) ||
+      currentPly < 0 ||
+      currentPly > maxPly
+    ) {
+      currentPositionLine.setAttribute("visibility", "hidden");
+      return;
+    }
+
+    const x = xPosition(currentPly);
+
+    currentPositionLine.setAttribute("x1", x);
+    currentPositionLine.setAttribute("x2", x);
+    currentPositionLine.setAttribute("visibility", "visible");
+  };
+
+  card.setCurrentPly(0);
+
 
   card.append(heading, legend, svg);
 
