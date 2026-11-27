@@ -2,7 +2,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const CHART_WIDTH = 640;
-const CHART_HEIGHT = 250;
+const CHART_HEIGHT = 340;
 
 const PLOT = {
   left: 62,
