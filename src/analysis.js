@@ -422,7 +422,7 @@ function renderBoard() {
       const piece = position.board.at(new Square(file, rank));
       const square = element(
         "div",
-        `analysis-square${(row + col) % 2 ? " is-dark" : ""}`
+        "analysis-square"
       );
 
       square.setAttribute("role", "gridcell");
