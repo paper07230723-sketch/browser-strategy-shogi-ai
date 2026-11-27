@@ -557,3 +557,133 @@ button {
   white-space: nowrap;
 }
 }
+
+
+/* 形勢グラフ */
+.analysis-evaluation-chart {
+  width: 100%;
+  margin: 12px 0 16px;
+  padding: 14px 12px 10px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #dce4dd;
+  border-radius: 9px;
+}
+
+.analysis-chart-title {
+  margin: 0 0 12px;
+  color: #303b32;
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.analysis-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.analysis-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #68736a;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.analysis-chart-legend-marker {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.analysis-chart-legend-marker.is-normal,
+.analysis-chart-point.is-normal {
+  background: #3979c6;
+}
+
+.analysis-chart-legend-marker.is-question,
+.analysis-chart-point.is-question {
+  background: #e99525;
+}
+
+.analysis-chart-legend-marker.is-blunder,
+.analysis-chart-point.is-blunder {
+  background: #d94343;
+}
+
+.analysis-chart-legend-marker.is-mate,
+.analysis-chart-point.is-mate {
+  background: #8957b5;
+}
+
+.analysis-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.analysis-chart-grid-line {
+  stroke: #e8ede9;
+  stroke-width: 1;
+}
+
+.analysis-chart-zero-line {
+  stroke: #8c9a8e;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.analysis-chart-axis {
+  stroke: #9aa69c;
+  stroke-width: 1;
+}
+
+.analysis-chart-axis-label {
+  fill: #778179;
+  font-size: 11px;
+}
+
+.analysis-chart-line {
+  fill: none;
+  stroke: #3979c6;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.analysis-chart-point {
+  stroke: #fff;
+  stroke-width: 1.8;
+  cursor: pointer;
+}
+
+.analysis-chart-point.is-normal {
+  fill: #3979c6;
+}
+
+.analysis-chart-point.is-question {
+  fill: #e99525;
+}
+
+.analysis-chart-point.is-blunder {
+  fill: #d94343;
+}
+
+.analysis-chart-point.is-mate {
+  fill: #8957b5;
+}
+
+.analysis-chart-point:hover {
+  stroke: #26352a;
+  stroke-width: 2.5;
+}
+
+.analysis-chart-point:focus {
+  outline: none;
+  stroke: #26352a;
+  stroke-width: 3;
+}
