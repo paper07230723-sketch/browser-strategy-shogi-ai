@@ -479,11 +479,13 @@ function renderBoard() {
   );
 }
 
+
 function updateMoveSelection() {
   if (!state.record) return;
 
   const currentPly = state.record.current.ply;
 
+  // 指し手一覧の選択状態を更新
   for (const button of moveList.querySelectorAll(
     ".analysis-move-button"
   )) {
@@ -497,7 +499,23 @@ function updateMoveSelection() {
       button.removeAttribute("aria-current");
     }
   }
+
+  // 解析結果表の選択状態を更新
+  for (const row of analysisProgress.querySelectorAll(
+    ".analysis-results-row"
+  )) {
+    const selected = Number(row.dataset.ply) === currentPly;
+
+    row.classList.toggle("is-current", selected);
+
+    if (selected) {
+      row.setAttribute("aria-current", "step");
+    } else {
+      row.removeAttribute("aria-current");
+    }
+  }
 }
+
 
 function renderPosition() {
   if (!state.record) return;
@@ -1105,6 +1123,7 @@ function renderAnalysisResults() {
   }
 
   analysisProgress.replaceChildren(fragment);
+  updateMoveSelection();
 }
 
 

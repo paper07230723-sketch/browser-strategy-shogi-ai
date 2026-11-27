@@ -490,6 +490,13 @@ button {
   background: #f4f8f4;
 }
 
+.analysis-results-row.is-current {
+  color: #174f30;
+  background: #e4f1e7;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px #77a786;
+}
+
 .analysis-results-row:focus-visible {
   position: relative;
   outline: 3px solid #6ca27e;
