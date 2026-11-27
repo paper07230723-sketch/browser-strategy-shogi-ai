@@ -299,7 +299,53 @@ export function createEvaluationChart({
     svg.appendChild(marker);
   }
 
+  
+  // グラフ内のタップ位置に対応する手数へ移動する。
+  svg.addEventListener("click", (event) => {
+    // 既存のマーカークリック処理を優先する。
+    if (
+      event.target instanceof Element &&
+      event.target.closest(".analysis-chart-point")
+    ) {
+      return;
+    }
+
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = ((event.clientX - rect.left) / rect.width) * CHART_WIDTH;
+    const y = ((event.clientY - rect.top) / rect.height) * CHART_HEIGHT;
+
+    // グラフの描画領域外では移動しない。
+    if (
+      x < PLOT.left ||
+      x > CHART_WIDTH - PLOT.right ||
+      y < PLOT.top ||
+      y > PLOT.top + plotHeight
+    ) {
+      return;
+    }
+
+    // 横方向の距離が最も近い解析局面を選択する。
+    let nearest = null;
+    let nearestDistance = Infinity;
+
+    for (const item of points) {
+      const distance = Math.abs(item.point.x - x);
+
+      if (distance < nearestDistance) {
+        nearest = item;
+        nearestDistance = distance;
+      }
+    }
+
+    if (nearest) {
+      onSelectPly?.(nearest.result.ply);
+    }
+  });
+
   card.append(heading, legend, svg);
 
   return card;
+
 }
