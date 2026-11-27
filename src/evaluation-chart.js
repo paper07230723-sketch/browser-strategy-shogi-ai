@@ -93,7 +93,6 @@ export function createEvaluationChart({
   legend.className = "analysis-chart-legend";
 
   legend.append(
-    createLegendItem("通常", "is-normal"),
     createLegendItem("疑問手", "is-question"),
     createLegendItem("悪手", "is-blunder"),
     createLegendItem("詰み", "is-mate"),
@@ -247,6 +246,14 @@ export function createEvaluationChart({
       result,
       resultsByPly
     );
+
+    if (
+      judgment !== "悪手" &&
+      judgment !== "疑問手" &&
+      point.score.type !== "mate"
+    ) {
+      continue;
+    }
 
     const markerClass =
       judgment === "悪手"
