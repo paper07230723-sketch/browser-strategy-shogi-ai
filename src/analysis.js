@@ -1,6 +1,7 @@
 
 import "./analysis.css";
 import { AnalysisEngine } from "./analysis-engine.js";
+import { createEvaluationChart } from "./evaluation-chart.js";
 import {
   Color,
   Record,
@@ -1079,8 +1080,20 @@ function renderAnalysisResults() {
         "解析結果はまだありません。"
       )
     );
-  } else {
-    fragment.appendChild(list);
+    } else {
+    const chart = createEvaluationChart({
+      results: state.analysisResults,
+      resultsByPly,
+      getMoveJudgment,
+      onSelectPly: (ply) => {
+        if (!state.record) return;
+
+        state.record.goto(ply);
+        renderPosition();
+      },
+    });
+
+    fragment.append(chart, list);
   }
 
   analysisProgress.replaceChildren(fragment);
