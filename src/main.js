@@ -69,6 +69,15 @@ const VALID_THINK_TIMES = [
   '0秒', '1秒', '2秒', '3秒', '4秒', '5秒',
 ];
 
+const STRATEGY_CONFIGS = Object.freeze({
+  none: {
+    label: '指定なし',
+  },
+  rightFour: {
+    label: '右四間飛車',
+  },
+});
+
 function loadAppSettings() {
   try {
     const saved = JSON.parse(
@@ -82,11 +91,16 @@ function loadAppSettings() {
         VALID_THINK_TIMES.includes(saved?.thinkTime)
           ? saved.thinkTime
           : '0秒',
+      strategyId:
+        Object.hasOwn(STRATEGY_CONFIGS, saved?.strategyId)
+          ? saved.strategyId
+          : 'none',
     };
   } catch {
     return {
       playerColor: 'black',
       thinkTime: '0秒',
+      strategyId: 'none',
     };
   }
 }
@@ -98,6 +112,7 @@ function saveAppSettings() {
       JSON.stringify({
         playerColor,
         thinkTime: selectedThinkTime,
+        strategyId: selectedStrategyId,
       })
     );
     return true;
@@ -110,6 +125,8 @@ function saveAppSettings() {
 const savedAppSettings = loadAppSettings();
 
 selectedThinkTime = savedAppSettings.thinkTime;
+
+let selectedStrategyId = savedAppSettings.strategyId;
 
 function loadSelectedEngineId() {
   try {
@@ -145,6 +162,7 @@ function savePausedGameSession() {
     moves: [...moveHistory],
     playerColor,
     thinkTime: selectedThinkTime,
+    strategyid: selectedStrategyId,
     engineId: selectedEngineId,
     gameStarted: true,
     gamePaused: true,
@@ -185,6 +203,10 @@ function loadPausedGameSession() {
       !validMoves ||
       !['black', 'white'].includes(session.playerColor) ||
       !VALID_THINK_TIMES.includes(session.thinkTime) ||
+      (
+        session.strategyId !== undefined &&
+        !Object.hasOwn(STRATEGY_CONFIGS, session.strategyId)
+      ) ||
       !Object.hasOwn(ENGINE_CONFIGS, session.engineId)
     ) {
       return null;
@@ -224,6 +246,10 @@ function restorePausedGameSession() {
     moveHistory = [...session.moves];
     playerColor = session.playerColor;
     selectedThinkTime = session.thinkTime;
+    selectedStrategyId =
+      Object.hasOwn(STRATEGY_CONFIGS, session.strategyId)
+        ? session.strategyId
+        : 'none';
     selectedEngineId = session.engineId;
 
     gameStarted = true;
@@ -1162,18 +1188,18 @@ function createApp() {
       </select>
     </label>
     <label>戦型
-      <select>
-        <option>指定なし</option>
-        <option>右四間飛車</option>
+      <select id="strategy-select">
+        <option value="none">指定なし</option>
+        <option value="rightFour">右四間飛車</option>
       </select>
     </label>
     <label>エンジン
-  <select id="engine-select">
-    <option value="suishou">水匠</option>
-    <option value="mini">つようら王11mini</option>
-    <option value="micro">つようら王11micro</option>
-  </select>
-</label>
+      <select id="engine-select">
+        <option value="suishou">水匠</option>
+        <option value="mini">つようら王11mini</option>
+        <option value="micro">つようら王11micro</option>
+      </select>
+    </label>
     <label>思考時間
       <select id="think-time-select">
         <option>0秒</option>
@@ -1235,7 +1261,36 @@ engineSelect.addEventListener('change', () => {
   window.location.reload();
 });
 
-  const thinkTimeSelect = controls.querySelector('#think-time-select');
+const strategySelect = controls.querySelector('#strategy-select');
+
+strategySelect.value = selectedStrategyId;
+strategySelect.disabled = gameStarted || gameOver;
+
+strategySelect.addEventListener('change', () => {
+  if (gameStarted || gameOver) {
+    strategySelect.value = selectedStrategyId;
+    return;
+  }
+
+  const nextStrategyId = strategySelect.value;
+
+  if (!Object.hasOwn(STRATEGY_CONFIGS, nextStrategyId)) {
+    strategySelect.value = selectedStrategyId;
+    return;
+  }
+
+  const previousStrategyId = selectedStrategyId;
+  selectedStrategyId = nextStrategyId;
+
+  if (!saveAppSettings()) {
+    selectedStrategyId = previousStrategyId;
+    strategySelect.value = previousStrategyId;
+    message = '戦型設定を保存できませんでした。';
+    render();
+  }
+});
+
+const thinkTimeSelect = controls.querySelector('#think-time-select');
 
 thinkTimeSelect.value = selectedThinkTime;
 thinkTimeSelect.disabled =
