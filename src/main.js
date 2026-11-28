@@ -151,7 +151,7 @@ let evaluationText = '—';
 let evaluationPerspectiveSign = 1;
 let evaluationDepth = -1;
 let aiSearchMultiPvCount = 1;
-let aiSearchCandidates = new Map();
+let aiSearchCandidatesByDepth = new Map();
 let moveHistory = [];
 let ignoreNextBestmove = false;
 let gameOver = false;
@@ -1603,7 +1603,7 @@ function requestAiMove() {
       )
     : 1;
 
-  aiSearchCandidates = new Map();
+  aiSearchCandidatesByDepth = new Map();
 
   addDiagnostic(
     `探索設定: 戦型=${selectedStrategyId}; ` +
@@ -1869,7 +1869,7 @@ if (factoryType !== 'function') {
 
         const pvMatch = received.match(/\bpv\s+(.+)$/);
 
-        // MultiPVの候補手・評価値・読み筋を保存する。
+        // 深さごとに候補を保存し、同じ深さで比較できるようにする。
         if (
           aiSearchMultiPvCount > 1 &&
           depthMatch &&
@@ -1877,6 +1877,56 @@ if (factoryType !== 'function') {
           pvMatch &&
           !hasBound
         ) {
+          const candidateDepth = Number(depthMatch[1]);
+          const candidateRank = multiPvMatch
+            ? Number(multiPvMatch[1])
+            : 1;
+
+          const candidateScore = Number(scoreMatch[2]);
+          const pvMoves = pvMatch[1].trim().split(/\s+/);
+
+          const validPv = pvMoves.every((usi) =>
+            /^(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/.test(usi)
+          );
+
+          if (
+            Number.isSafeInteger(candidateDepth) &&
+            candidateDepth >= 1 &&
+            Number.isSafeInteger(candidateRank) &&
+            candidateRank >= 1 &&
+            candidateRank <= aiSearchMultiPvCount &&
+            Number.isSafeInteger(candidateScore) &&
+            pvMoves.length > 0 &&
+            validPv
+          ) {
+            let candidatesAtDepth =
+              aiSearchCandidatesByDepth.get(candidateDepth);
+
+            if (!candidatesAtDepth) {
+              candidatesAtDepth = new Map();
+              aiSearchCandidatesByDepth.set(
+                candidateDepth,
+                candidatesAtDepth
+              );
+            }
+
+            const previousCandidate =
+              candidatesAtDepth.get(candidateRank);
+
+            // 同じ深さなら、読み筋が長い情報を優先する。
+            if (
+              !previousCandidate ||
+              pvMoves.length >= previousCandidate.pv.length
+            ) {
+              candidatesAtDepth.set(candidateRank, {
+                depth: candidateDepth,
+                scoreType: scoreMatch[1],
+                score: candidateScore,
+                pv: pvMoves,
+              });
+            }
+          }
+        } {
           const candidateDepth = Number(depthMatch[1]);
           const candidateRank = multiPvMatch
             ? Number(multiPvMatch[1])
@@ -2028,30 +2078,68 @@ if (factoryType !== 'function') {
         const usiMove = match?.[1];
 
         if (aiSearchMultiPvCount > 1) {
-          const candidateSummaries = [
-            ...aiSearchCandidates.entries()
+          // すべての候補が揃っている、最も深い探索結果を選ぶ。
+          const completeSnapshots = [
+            ...aiSearchCandidatesByDepth.entries()
           ]
-            .sort((a, b) => a[0] - b[0])
-            .map(([rank, candidate]) => {
+            .filter(([, candidatesAtDepth]) =>
+              Array.from(
+                { length: aiSearchMultiPvCount },
+                (_, index) => index + 1
+              ).every((rank) =>
+                candidatesAtDepth.has(rank)
+              )
+            )
+            .sort((a, b) => b[0] - a[0]);
+
+          if (completeSnapshots.length > 0) {
+            const [commonDepth, candidatesAtDepth] =
+              completeSnapshots[0];
+
+            const candidateSummaries = [];
+
+            for (
+              let rank = 1;
+              rank <= aiSearchMultiPvCount;
+              rank++
+            ) {
+              const candidate = candidatesAtDepth.get(rank);
+
               const pvText = candidate.pv
                 .slice(0, 8)
                 .join(' ');
 
-              return (
-                `#${rank} depth=${candidate.depth} ` +
-                `${candidate.scoreType}=${candidate.score}; ` +
+              candidateSummaries.push(
+                `#${rank} ${candidate.scoreType}=${candidate.score}; ` +
                 `PV=${pvText}`
               );
-            });
+            }
 
-          addDiagnostic(
-            candidateSummaries.length > 0
-              ? `MultiPV候補 ${candidateSummaries.length}/` +
-                `${aiSearchMultiPvCount}: ` +
-                candidateSummaries.join(' | ')
-              : `MultiPV候補を取得できませんでした。` +
-                `設定=${aiSearchMultiPvCount}`
-          );
+            addDiagnostic(
+              `MultiPV共通深さ=${commonDepth}; ` +
+              `候補=${candidateSummaries.length}/` +
+              `${aiSearchMultiPvCount}: ` +
+              candidateSummaries.join(' | ')
+            );
+          } else {
+            // 同じ深さで全候補が揃わなかった場合は混ぜずに記録する。
+            const depthSummary = [
+              ...aiSearchCandidatesByDepth.entries()
+            ]
+              .sort((a, b) => b[0] - a[0])
+              .slice(0, 5)
+              .map(([depth, candidates]) =>
+                `深さ${depth}:順位${[
+                  ...candidates.keys()
+                ].sort((a, b) => a - b).join(',')}`
+              )
+              .join(' | ');
+
+            addDiagnostic(
+              '同一深さで全候補が揃いませんでした: ' +
+              (depthSummary || '候補情報なし')
+            );
+          }
         }
 
         aiThinking = false;
