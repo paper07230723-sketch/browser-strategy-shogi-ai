@@ -7,7 +7,7 @@
     Arial,
     sans-serif;
   color: #202820;
-  background: #f5f7f5;
+  background: #fff4df;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -29,10 +29,10 @@ body {
   background:
     radial-gradient(
       circle at 50% 0%,
-      #e4efe6 0,
+      #ffe0ad 0,
       transparent 55%
     ),
-    #f5f7f5;
+    #fff4df;
 }
 
 .home-shell {
