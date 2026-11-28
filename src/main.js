@@ -162,7 +162,7 @@ function savePausedGameSession() {
     moves: [...moveHistory],
     playerColor,
     thinkTime: selectedThinkTime,
-    strategyid: selectedStrategyId,
+    strategyId: selectedStrategyId,
     engineId: selectedEngineId,
     gameStarted: true,
     gamePaused: true,
