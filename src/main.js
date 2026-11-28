@@ -143,6 +143,7 @@ let playerColor = savedAppSettings.playerColor;
 let engine = null;
 let engineReady = false;
 let aiThinking = false;
+let engineMultiPvOption = null;
 let engineStage = 'loading';
 let engineStatusText = 'AIエンジン：接続準備中';
 let aiStatusText = 'AIの初期化中';
@@ -1802,11 +1803,36 @@ if (factoryType !== 'function') {
 }
 
     engineStage = 'usi';
-    addDiagnostic('USI応答の待機を開始');
+    engineMultiPvOption = null;
+
+    addDiagnostic(
+      `USI応答の待機を開始; エンジン=${selectedEngineId}`
+    );
 
     engine.addMessageListener((line) => {
       const received = String(line).trim();
       console.log('[USI]', received);
+      // エンジンがMultiPVオプションを公開しているか確認する。
+      if (engineStage === 'usi') {
+        const multiPvMatch = received.match(
+          /^option name MultiPV type spin default (\d+) min (\d+) max (\d+)$/i
+        );
+
+        if (multiPvMatch) {
+          engineMultiPvOption = {
+            defaultValue: Number(multiPvMatch[1]),
+            min: Number(multiPvMatch[2]),
+            max: Number(multiPvMatch[3]),
+          };
+
+          addDiagnostic(
+            `MultiPV対応確認: ` +
+            `default=${engineMultiPvOption.defaultValue}; ` +
+            `min=${engineMultiPvOption.min}; ` +
+            `max=${engineMultiPvOption.max}`
+          );
+        }
+      }
 
       if (engineStage === 'thinking' && received.startsWith('info ')) {
         const depthMatch = received.match(/\bdepth\s+(\d+)\b/);
@@ -1864,6 +1890,17 @@ if (factoryType !== 'function') {
         engineStage = 'ready';
 
         addDiagnostic('USI応答: usiok');
+        
+        if (engineMultiPvOption) {
+          addDiagnostic(
+            `MultiPV利用可能: ${engineMultiPvOption.min}～` +
+            `${engineMultiPvOption.max}候補`
+          );
+        } else {
+          addDiagnostic(
+            'MultiPVオプション未検出。このエンジンでは設定を保留します。'
+          );
+        }
 
         setEngineStatus(
           'AIエンジン：準備完了を確認中...'
