@@ -1869,6 +1869,7 @@ if (factoryType !== 'function') {
 
         const pvMatch = received.match(/\bpv\s+(.+)$/);
 
+
         // 深さごとに候補を保存し、同じ深さで比較できるようにする。
         if (
           aiSearchMultiPvCount > 1 &&
@@ -1926,45 +1927,8 @@ if (factoryType !== 'function') {
               });
             }
           }
-        } {
-          const candidateDepth = Number(depthMatch[1]);
-          const candidateRank = multiPvMatch
-            ? Number(multiPvMatch[1])
-            : 1;
-
-          const candidateScore = Number(scoreMatch[2]);
-          const pvMoves = pvMatch[1].trim().split(/\s+/);
-
-          const validPv = pvMoves.every((usi) =>
-            /^(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/.test(usi)
-          );
-
-          if (
-            Number.isSafeInteger(candidateDepth) &&
-            candidateDepth >= 1 &&
-            Number.isSafeInteger(candidateRank) &&
-            candidateRank >= 1 &&
-            candidateRank <= aiSearchMultiPvCount &&
-            Number.isSafeInteger(candidateScore) &&
-            pvMoves.length > 0 &&
-            validPv
-          ) {
-            const previousCandidate =
-              aiSearchCandidates.get(candidateRank);
-
-            if (
-              !previousCandidate ||
-              candidateDepth >= previousCandidate.depth
-            ) {
-              aiSearchCandidates.set(candidateRank, {
-                depth: candidateDepth,
-                scoreType: scoreMatch[1],
-                score: candidateScore,
-                pv: pvMoves,
-              });
-            }
-          }
         }
+
 
         if (
           depthMatch &&
