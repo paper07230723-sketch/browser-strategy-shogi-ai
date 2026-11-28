@@ -1161,12 +1161,48 @@ async function startAnalysis() {
       analysisProgress.textContent =
         `進捗：${index + 1} / ${positions.length} 局面`;
 
-      const result = await analysisEngine.analyze(
-        `position sfen ${position.sfen}`,
+
+      const positionCommand = `position sfen ${position.sfen}`;
+
+      let result = await analysisEngine.analyze(
+        positionCommand,
         thinkSeconds
       );
 
       if (result.cancelled || state.analysisCancelled) break;
+
+      // 評価値がなく、通常の推奨手が取得できている場合だけ再解析する
+      const hasNormalBestMove =
+        typeof result.bestmove === "string" &&
+        !["0000", "draw", "rep_draw", "timeout", "break"].includes(
+         result.bestmove
+        );
+
+      if (!result.info?.score && hasNormalBestMove) {
+        engineStatus.textContent =
+          `${position.ply}手目の評価値を再取得しています（1回目）。`;
+
+        analysisProgress.textContent =
+          `進捗：${index + 1} / ${positions.length} 局面`;
+
+        const retryResult = await analysisEngine.analyze(
+          positionCommand,
+          thinkSeconds
+        );
+
+        if (retryResult.cancelled || state.analysisCancelled) break;
+
+        // 再解析で取得できた情報を優先する。
+        // 取得できなかった情報は最初の結果を維持する。
+        result = {
+          ...result,
+          bestmove: retryResult.bestmove ?? result.bestmove,
+          info: retryResult.info?.score
+            ? retryResult.info
+            : result.info,
+        };
+      }
+
 
       state.analysisResults.push({
         ply: position.ply,
