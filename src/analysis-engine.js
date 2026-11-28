@@ -42,11 +42,30 @@ function parseInfo(line) {
   const score = line.match(/\bscore\s+(cp|mate)\s+(-?\d+)\b/);
   const pv = line.match(/\bpv\s+(.+)$/);
 
+  // MultiPVの第1候補以外は使用しない
   if (multiPv && Number(multiPv[1]) !== 1) return null;
 
+  // 評価値を含まないinfo行は解析結果として扱わない
+  if (!score) return null;
+
+  const depthValue = depth ? Number(depth[1]) : null;
+  const scoreValue = Number(score[2]);
+
+  if (!Number.isSafeInteger(scoreValue)) return null;
+
+  if (
+    depthValue !== null &&
+    (!Number.isSafeInteger(depthValue) || depthValue < 0)
+  ) {
+    return null;
+  }
+
   return {
-    depth: depth ? Number(depth[1]) : null,
-    score: score ? { type: score[1], value: Number(score[2]) } : null,
+    depth: depthValue,
+    score: {
+      type: score[1],
+      value: scoreValue,
+    },
     pv: pv ? pv[1].trim().split(/\s+/) : [],
     raw: line,
   };
@@ -266,16 +285,26 @@ export class AnalysisEngine {
     const search = this.search;
     if (!search) return;
 
+    
     if (line.startsWith('info ')) {
       const info = parseInfo(line);
+
       if (info) {
-        search.lastInfo = info;
-        try {
-          search.onInfo(info);
-        } catch (error) {
-          console.error('解析情報の通知に失敗しました:', error);
+        const previousDepth = search.lastInfo?.depth ?? -1;
+        const nextDepth = info.depth ?? -1;
+
+        // 有効な評価値を保持し、浅い探索結果で上書きしない
+        if (!search.lastInfo || nextDepth >= previousDepth) {
+          search.lastInfo = info;
+
+          try {
+            search.onInfo(info);
+          } catch (error) {
+            console.error('解析情報の通知に失敗しました:', error);
+          }
         }
       }
+
       return;
     }
 
