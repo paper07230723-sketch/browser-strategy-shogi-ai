@@ -150,6 +150,8 @@ let aiStatusText = 'AIの初期化中';
 let evaluationText = '—';
 let evaluationPerspectiveSign = 1;
 let evaluationDepth = -1;
+let aiSearchMultiPvCount = 1;
+let aiSearchCandidates = new Map();
 let moveHistory = [];
 let ignoreNextBestmove = false;
 let gameOver = false;
@@ -1588,6 +1590,26 @@ function requestAiMove() {
     return;
   }
 
+  const requestedMultiPvCount =
+    selectedStrategyId === 'rightFour' ? 3 : 1;
+
+  aiSearchMultiPvCount = engineMultiPvOption
+    ? Math.min(
+        engineMultiPvOption.max,
+        Math.max(
+          engineMultiPvOption.min,
+          requestedMultiPvCount
+        )
+      )
+    : 1;
+
+  aiSearchCandidates = new Map();
+
+  addDiagnostic(
+    `探索設定: 戦型=${selectedStrategyId}; ` +
+    `MultiPV=${aiSearchMultiPvCount}`
+  );
+
   evaluationPerspectiveSign =
     record.position.color === 'black' ? 1 : -1;
   evaluationDepth = -1;
@@ -1607,6 +1629,11 @@ function requestAiMove() {
 
     const selectedTime = Number.parseInt(selectedThinkTime, 10);
 
+    if (engineMultiPvOption) {
+      engine.postMessage(
+        `setoption name MultiPV value ${aiSearchMultiPvCount}`
+      );
+    }
     engine.postMessage(positionCommand);
 
     if (selectedTime > 0) {
@@ -1840,6 +1867,55 @@ if (factoryType !== 'function') {
         const scoreMatch = received.match(/\bscore\s+(cp|mate)\s+(-?\d+)\b/);
         const hasBound = /\b(?:lowerbound|upperbound)\b/.test(received);
 
+        const pvMatch = received.match(/\bpv\s+(.+)$/);
+
+        // MultiPVの候補手・評価値・読み筋を保存する。
+        if (
+          aiSearchMultiPvCount > 1 &&
+          depthMatch &&
+          scoreMatch &&
+          pvMatch &&
+          !hasBound
+        ) {
+          const candidateDepth = Number(depthMatch[1]);
+          const candidateRank = multiPvMatch
+            ? Number(multiPvMatch[1])
+            : 1;
+
+          const candidateScore = Number(scoreMatch[2]);
+          const pvMoves = pvMatch[1].trim().split(/\s+/);
+
+          const validPv = pvMoves.every((usi) =>
+            /^(?:[1-9][a-i][1-9][a-i]\+?|[PLNSGBR]\*[1-9][a-i])$/.test(usi)
+          );
+
+          if (
+            Number.isSafeInteger(candidateDepth) &&
+            candidateDepth >= 1 &&
+            Number.isSafeInteger(candidateRank) &&
+            candidateRank >= 1 &&
+            candidateRank <= aiSearchMultiPvCount &&
+            Number.isSafeInteger(candidateScore) &&
+            pvMoves.length > 0 &&
+            validPv
+          ) {
+            const previousCandidate =
+              aiSearchCandidates.get(candidateRank);
+
+            if (
+              !previousCandidate ||
+              candidateDepth >= previousCandidate.depth
+            ) {
+              aiSearchCandidates.set(candidateRank, {
+                depth: candidateDepth,
+                scoreType: scoreMatch[1],
+                score: candidateScore,
+                pv: pvMoves,
+              });
+            }
+          }
+        }
+
         if (
           depthMatch &&
           (!multiPvMatch || Number(multiPvMatch[1]) === 1) &&
@@ -1950,6 +2026,33 @@ if (factoryType !== 'function') {
       ) {
         const match = received.match(/^bestmove\s+(\S+)/);
         const usiMove = match?.[1];
+
+        if (aiSearchMultiPvCount > 1) {
+          const candidateSummaries = [
+            ...aiSearchCandidates.entries()
+          ]
+            .sort((a, b) => a[0] - b[0])
+            .map(([rank, candidate]) => {
+              const pvText = candidate.pv
+                .slice(0, 8)
+                .join(' ');
+
+              return (
+                `#${rank} depth=${candidate.depth} ` +
+                `${candidate.scoreType}=${candidate.score}; ` +
+                `PV=${pvText}`
+              );
+            });
+
+          addDiagnostic(
+            candidateSummaries.length > 0
+              ? `MultiPV候補 ${candidateSummaries.length}/` +
+                `${aiSearchMultiPvCount}: ` +
+                candidateSummaries.join(' | ')
+              : `MultiPV候補を取得できませんでした。` +
+                `設定=${aiSearchMultiPvCount}`
+          );
+        }
 
         aiThinking = false;
         engineStage = 'idle';
